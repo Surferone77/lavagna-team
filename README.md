@@ -80,3 +80,4 @@ src/App.jsx                             -> la app
 src/supabaseClient.js                   -> connessione Supabase
 .env.example                           -> variabili da compilare
 ```
+# lavagna-team
