@@ -1,4 +1,554 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+// Supabase client
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Colors & Styles
+const GREEN = "#00C136";
+const DARK = "#1a1a1a";
+const MUTED = "#999";
+const BG = "#0f0f0f";
+
+const headerStyle = {
+  background: GREEN,
+  color: DARK,
+  padding: "20px",
+  textAlign: "center",
+  fontWeight: "bold",
+  fontSize: 18,
+  borderRadius: "0 0 12px 12px",
+};
+
+const btnStyle = {
+  background: GREEN,
+  color: DARK,
+  border: "none",
+  padding: "12px 20px",
+  borderRadius: "8px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: 14,
+};
+
+const btnBackStyle = {
+  background: MUTED,
+  color: "#fff",
+  border: "none",
+  padding: "8px 16px",
+  borderRadius: "6px",
+  cursor: "pointer",
+  fontSize: 12,
+  marginBottom: "12px",
+};
+
+const inputStyle = {
+  padding: "10px",
+  borderRadius: "6px",
+  border: `1px solid ${GREEN}`,
+  background: "#1a1a1a",
+  color: "#fff",
+  fontSize: 14,
+  marginBottom: "8px",
+  width: "100%",
+  boxSizing: "border-box",
+};
+
+// Home Screen
+function HomeScreen({ onNavigate }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    <div style={{ minHeight: "100vh", background: BG, color: "#fff" }}>
+      <div style={headerStyle}>The Hybrid Engine</div>
+      
+      <div style={{ padding: "20px", textAlign: "center" }}>
+        <p style={{ fontSize: 14, color: MUTED, marginBottom: "30px" }}>
+          Ciao Chicco · classifica live, condivisa col team
+        </p>
+
+        {menuOpen && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
+            <button style={btnStyle} onClick={() => { setMenuOpen(false); onNavigate("calendario"); }}>
+              📅 Calendario
+            </button>
+            <button style={btnStyle} onClick={() => { setMenuOpen(false); onNavigate("screenshot"); }}>
+              📸 Carica Screenshot
+            </button>
+            <button style={btnStyle} onClick={() => { setMenuOpen(false); onNavigate("comunicazioni"); }}>
+              💬 Comunicazioni
+            </button>
+            <button style={{ ...btnStyle, background: MUTED }} onClick={() => setMenuOpen(false)}>
+              ✕ Chiudi
+            </button>
+          </div>
+        )}
+
+        {!menuOpen && (
+          <button style={btnStyle} onClick={() => setMenuOpen(true)}>
+            ☰ Menu
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Calendario Screen
+function CalendarioScreen({ onNavigate, onSelectWeek }) {
+  const [weeks, setWeeks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchWeeks();
+  }, []);
+
+  const fetchWeeks = async () => {
+    try {
+      const { data, error } = await supabase.from("weeks").select("*");
+      if (error) throw error;
+      setWeeks(data || []);
+    } catch (err) {
+      console.error("Errore caricamento settimane:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div style={{ padding: "20px", color: MUTED }}>Caricamento...</div>;
+
+  return (
+    <div style={{ minHeight: "100vh", background: BG, color: "#fff" }}>
+      <button style={btnBackStyle} onClick={() => onNavigate("home")}>← Torna a Home</button>
+      
+      <div style={headerStyle}>Calendario</div>
+
+      <div style={{ padding: "20px" }}>
+        {weeks.length === 0 ? (
+          <p style={{ color: MUTED, textAlign: "center" }}>Nessuna settimana disponibile</p>
+        ) : (
+          weeks.map((week) => (
+            <div
+              key={week.id}
+              style={{
+                background: "#1a1a1a",
+                border: `2px solid ${GREEN}`,
+                borderRadius: "8px",
+                padding: "15px",
+                marginBottom: "12px",
+                cursor: "pointer",
+              }}
+              onClick={() => {
+                onSelectWeek(week);
+                onNavigate("dettaglio");
+              }}
+            >
+              <div style={{ fontWeight: "bold", fontSize: 16, color: GREEN }}>
+                {week.label || week.id}
+              </div>
+              <div style={{ fontSize: 12, color: MUTED, marginTop: "4px" }}>
+                {week.data?.days?.length || 0} giorni
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Dettaglio Settimana Screen
+function DettaglioWeekScreen({ week, onNavigate, onUpdate }) {
+  const [editingWorkoutIndex, setEditingWorkoutIndex] = useState(null);
+  const [editData, setEditData] = useState({});
+
+  const days = week?.data?.days || [];
+
+  const handleSaveWorkout = async (dayIdx, workoutIdx) => {
+    if (!editData.tempo) {
+      alert("Inserisci un tempo valido");
+      return;
+    }
+
+    const newDays = JSON.parse(JSON.stringify(days));
+    newDays[dayIdx].workouts[workoutIdx].tempo = editData.tempo;
+    newDays[dayIdx].workouts[workoutIdx].note = editData.note || "";
+
+    const updated = { ...week, data: { ...week.data, days: newDays } };
+    
+    try {
+      const { error } = await supabase
+        .from("weeks")
+        .update({ data: updated.data })
+        .eq("id", week.id);
+      
+      if (error) throw error;
+      onUpdate(updated);
+      setEditingWorkoutIndex(null);
+      alert("Workout aggiornato!");
+    } catch (err) {
+      console.error("Errore salvataggio:", err);
+      alert("Errore nel salvataggio");
+    }
+  };
+
+  const handleDeleteWorkout = async (dayIdx, workoutIdx) => {
+    if (!confirm("Elimina questo workout?")) return;
+
+    const newDays = JSON.parse(JSON.stringify(days));
+    newDays[dayIdx].workouts.splice(workoutIdx, 1);
+
+    const updated = { ...week, data: { ...week.data, days: newDays } };
+    
+    try {
+      const { error } = await supabase
+        .from("weeks")
+        .update({ data: updated.data })
+        .eq("id", week.id);
+      
+      if (error) throw error;
+      onUpdate(updated);
+      alert("Workout eliminato!");
+    } catch (err) {
+      console.error("Errore eliminazione:", err);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: BG, color: "#fff" }}>
+      <button style={btnBackStyle} onClick={() => onNavigate("calendario")}>← Torna al Calendario</button>
+      
+      <div style={headerStyle}>{week.label}</div>
+
+      <div style={{ padding: "20px" }}>
+        {days.length === 0 ? (
+          <p style={{ color: MUTED, textAlign: "center" }}>Nessun giorno registrato</p>
+        ) : (
+          days.map((day, dayIdx) => (
+            <div key={dayIdx} style={{ marginBottom: "20px" }}>
+              <div style={{ fontSize: 14, fontWeight: "bold", color: GREEN, marginBottom: "10px" }}>
+                {day.date}
+              </div>
+
+              {(day.workouts || []).length === 0 ? (
+                <p style={{ color: MUTED, fontSize: 12 }}>Nessun workout</p>
+              ) : (
+                (day.workouts || []).map((workout, wIdx) => (
+                  <div
+                    key={wIdx}
+                    style={{
+                      background: "#1a1a1a",
+                      border: `1px solid ${GREEN}`,
+                      borderRadius: "6px",
+                      padding: "12px",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    {editingWorkoutIndex === `${dayIdx}-${wIdx}` ? (
+                      <div>
+                        <input
+                          style={inputStyle}
+                          type="text"
+                          placeholder="Tempo (es. 45:30)"
+                          value={editData.tempo || ""}
+                          onChange={(e) => setEditData({ ...editData, tempo: e.target.value })}
+                        />
+                        <input
+                          style={inputStyle}
+                          type="text"
+                          placeholder="Note"
+                          value={editData.note || ""}
+                          onChange={(e) => setEditData({ ...editData, note: e.target.value })}
+                        />
+                        <button
+                          style={{ ...btnStyle, marginRight: "10px" }}
+                          onClick={() => handleSaveWorkout(dayIdx, wIdx)}
+                        >
+                          Salva
+                        </button>
+                        <button
+                          style={{ ...btnStyle, background: MUTED }}
+                          onClick={() => setEditingWorkoutIndex(null)}
+                        >
+                          Annulla
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ fontSize: 12, marginBottom: "8px" }}>
+                          <strong>{workout.nome}</strong> - {workout.tempo}
+                        </div>
+                        {workout.note && (
+                          <div style={{ fontSize: 11, color: MUTED, marginBottom: "8px" }}>
+                            {workout.note}
+                          </div>
+                        )}
+                        <button
+                          style={{ ...btnStyle, fontSize: 12, marginRight: "8px" }}
+                          onClick={() => {
+                            setEditData({ tempo: workout.tempo, note: workout.note || "" });
+                            setEditingWorkoutIndex(`${dayIdx}-${wIdx}`);
+                          }}
+                        >
+                          ✏️ Modifica
+                        </button>
+                        <button
+                          style={{ ...btnStyle, fontSize: 12, background: "#d32f2f" }}
+                          onClick={() => handleDeleteWorkout(dayIdx, wIdx)}
+                        >
+                          🗑️ Elimina
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Carica Screenshot Screen
+function CaricaScreenshotScreen({ onNavigate }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [parsed, setParsed] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileSelect = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      const reader = new FileReader();
+      reader.onload = (ev) => setPreview(ev.target.result);
+      reader.readAsDataURL(selectedFile);
+    }
+  };
+
+  const handleParse = async () => {
+    if (!file) {
+      alert("Seleziona un screenshot");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Simulazione parsing (in produzione user Tesseract.js o API vision)
+      setParsed({
+        data: new Date().toISOString().split("T")[0],
+        workouts: [
+          { nome: "Workout 1", tempo: "45:30", note: "Da screenshot" },
+        ],
+      });
+      alert("Screenshot parsato! Verifica i dati.");
+    } catch (err) {
+      alert("Errore nel parsing");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: BG, color: "#fff" }}>
+      <button style={btnBackStyle} onClick={() => onNavigate("home")}>← Torna a Home</button>
+      
+      <div style={headerStyle}>Carica Screenshot</div>
+
+      <div style={{ padding: "20px" }}>
+        <input type="file" accept="image/*" onChange={handleFileSelect} style={{ marginBottom: "15px" }} />
+
+        {preview && (
+          <div style={{ marginBottom: "15px" }}>
+            <img src={preview} alt="Preview" style={{ maxWidth: "100%", borderRadius: "8px", maxHeight: "300px" }} />
+          </div>
+        )}
+
+        <button style={btnStyle} onClick={handleParse} disabled={uploading}>
+          {uploading ? "Parsing..." : "🔍 Parse Screenshot"}
+        </button>
+
+        {parsed && (
+          <div style={{ marginTop: "20px", background: "#1a1a1a", padding: "15px", borderRadius: "8px" }}>
+            <div style={{ fontSize: 14, fontWeight: "bold", color: GREEN, marginBottom: "10px" }}>
+              Dati estratti:
+            </div>
+            <div style={{ fontSize: 12, color: MUTED }}>
+              Data: {parsed.data}
+            </div>
+            {parsed.workouts.map((w, idx) => (
+              <div key={idx} style={{ fontSize: 12, marginTop: "8px" }}>
+                {w.nome} - {w.tempo} ({w.note})
+              </div>
+            ))}
+            <button style={{ ...btnStyle, marginTop: "15px" }}>
+              ✅ Salva Dati
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Comunicazioni Screen
+function ComunicazioniScreen({ onNavigate }) {
+  const [messages, setMessages] = useState([]);
+  const [newMsg, setNewMsg] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
+
+  const fetchMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("comunicazioni")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      setMessages(data || []);
+    } catch (err) {
+      console.error("Errore caricamento messaggi:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMsg.trim()) {
+      alert("Scrivi un messaggio");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("comunicazioni").insert([
+        {
+          utente: "Chicco",
+          messaggio: newMsg,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (error) throw error;
+      setNewMsg("");
+      fetchMessages();
+    } catch (err) {
+      console.error("Errore invio:", err);
+      alert("Errore nell'invio del messaggio");
+    }
+  };
+
+  if (loading) return <div style={{ padding: "20px", color: MUTED }}>Caricamento...</div>;
+
+  return (
+    <div style={{ minHeight: "100vh", background: BG, color: "#fff" }}>
+      <button style={btnBackStyle} onClick={() => onNavigate("home")}>← Torna a Home</button>
+      
+      <div style={headerStyle}>Comunicazioni</div>
+
+      <div style={{ padding: "20px", paddingBottom: "120px" }}>
+        {messages.length === 0 ? (
+          <p style={{ color: MUTED, textAlign: "center" }}>Nessun messaggio</p>
+        ) : (
+          messages.map((msg, idx) => (
+            <div
+              key={idx}
+              style={{
+                background: "#1a1a1a",
+                border: `1px solid ${GREEN}`,
+                borderRadius: "8px",
+                padding: "12px",
+                marginBottom: "10px",
+              }}
+            >
+              <div style={{ fontWeight: "bold", fontSize: 12, color: GREEN }}>
+                {msg.utente}
+              </div>
+              <div style={{ fontSize: 13, marginTop: "6px" }}>
+                {msg.messaggio}
+              </div>
+              <div style={{ fontSize: 10, color: MUTED, marginTop: "6px" }}>
+                {new Date(msg.created_at).toLocaleString()}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Fixed input area */}
+      <div style={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: BG,
+        borderTop: `1px solid ${GREEN}`,
+        padding: "15px",
+        display: "flex",
+        gap: "10px",
+      }}>
+        <input
+          type="text"
+          placeholder="Scrivi un messaggio..."
+          value={newMsg}
+          onChange={(e) => setNewMsg(e.target.value)}
+          onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+          style={{
+            ...inputStyle,
+            marginBottom: 0,
+            flex: 1,
+          }}
+        />
+        <button style={btnStyle} onClick={handleSendMessage}>
+          Invia
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Main App
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState("home");
+  const [selectedWeek, setSelectedWeek] = useState(null);
+
+  const handleNavigate = (screen) => {
+    setCurrentScreen(screen);
+  };
+
+  const handleSelectWeek = (week) => {
+    setSelectedWeek(week);
+  };
+
+  const handleUpdateWeek = (updatedWeek) => {
+    setSelectedWeek(updatedWeek);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: BG, color: "#fff" }}>
+      {currentScreen === "home" && <HomeScreen onNavigate={handleNavigate} />}
+      {currentScreen === "calendario" && (
+        <CalendarioScreen onNavigate={handleNavigate} onSelectWeek={handleSelectWeek} />
+      )}
+      {currentScreen === "dettaglio" && selectedWeek && (
+        <DettaglioWeekScreen
+          week={selectedWeek}
+          onNavigate={handleNavigate}
+          onUpdate={handleUpdateWeek}
+        />
+      )}
+      {currentScreen === "screenshot" && <CaricaScreenshotScreen onNavigate={handleNavigate} />}
+      {currentScreen === "comunicazioni" && <ComunicazioniScreen onNavigate={handleNavigate} />}
+    </div>
+  );
+}import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Plus, Trophy, Clock, Dumbbell, X, Check, Trash2, ChevronDown, ChevronUp, Flame, Upload, Calendar, Camera } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
