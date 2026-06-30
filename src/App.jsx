@@ -30,7 +30,7 @@ const display = (type, value, raw) => {
 };
 const parse = (s) => { try { return JSON.parse(s); } catch { return null; } };
 function ingest(week) {
-  return { ...week, days: (week.days || []).map(d => ({
+  return { ...week, days: ((week?.days ?? []) || []).map(d => ({
     ...d, workouts: (d.workouts || []).map((w, i) => ({ id: `${week.id}__${d.key}__${i}`, title: w.title, tag: w.tag || "", type: w.type, detail: w.detail || "" })),
   })) };
 }
@@ -133,7 +133,7 @@ export default function App() {
   if (screen === "import") return <ImportPanel onImport={importWeek} onCancel={() => setScreen("board")} />;
   if (screen === "upload") return <UploadPanel defaultWeekId={currentId || "2026-W27"} defaultWeekLabel={week ? week.label : ""} onAdd={addDay} onCancel={() => setScreen("board")} />;
 
-  const day = week ? week.days.find(d => d.key === dayKey) : null;
+  const day = week ? (week?.days ?? []).find(d => d.key === dayKey) : null;
 
   return (
     <Shell>
@@ -153,9 +153,9 @@ export default function App() {
       </div>
       <div style={{ color: MUTED, fontSize: 12, margin: "8px 0 16px" }}>Ciao <span style={{ color: GREEN, fontWeight: 600 }}>{name}</span> · classifica live, condivisa col team</div>
 
-      {week && week.days.length > 0 && (
+      {week && (week?.days ?? []).length > 0 && (
         <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 16 }}>
-          {week.days.map(d => {
+          {(week?.days ?? []).map(d => {
             const on = d.key === dayKey;
             return (
               <button key={d.key} onClick={() => setDayKey(d.key)} style={{
