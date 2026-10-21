@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Trophy, X, Check, Trash2, ChevronDown, ChevronUp, NotebookPen } from "lucide-react";
 import PhotoStrip from "./PhotoStrip";
+import NotesSection from "./NotesSection";
 import { TYPE_META, toValue, display, formatHint, buildBoard } from "../lib/scoring";
 import { GREEN, CARD, LINE, MUTED, RED, inp, btnGreen, btnGhost, btnTextMuted, pill, pillOn } from "../lib/theme";
 
@@ -32,6 +33,7 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
         </div>
         <pre style={{ color: "#dcdcdc", fontSize: 15, lineHeight: 1.55, whiteSpace: "pre-wrap", fontFamily: "inherit", margin: "14px 0 0" }}>{w.detail}</pre>
         <PhotoStrip w={w} name={name} date={date} />
+        <NotesSection w={w} name={name} />
       </div>
 
       {!isNote && <>
