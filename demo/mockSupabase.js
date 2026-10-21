@@ -45,6 +45,7 @@ const db = {
     sc(mon[1].id, "Chicco", 115, "115"), sc(mon[0].id, "Chicco", 1460, "24:20"),
     sc(mon[1].id, "Marco", 120, "120"), sc(mon[1].id, "Luca", 110, "110"), sc(mon[1].id, "Giulia", 85, "85"),
   ],
+  workout_done: [mon[0].id, mon[1].id, `${PW}__mar__0`].map((w, i) => ({ id: `d${i}`, athlete: "Chicco", workout_id: w, week_id: w.split("__")[0] })),
   comunicazioni: [
     { id: "c1", utente: "Giulia", messaggio: "Domani alle 18:30 chi c'è? Porto i sacchi per il sled 💪", created_at: new Date(Date.now() - 5 * 3600e3).toISOString() },
     { id: "c2", utente: "Marco", messaggio: "Presente. Metcon di oggi brutale.", created_at: new Date(Date.now() - 2 * 3600e3).toISOString() },

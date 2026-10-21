@@ -66,6 +66,7 @@ function Main() {
   const [entered, setEntered] = useState(session.get("entered") === "1");
   const [weeks, setWeeks] = useState({});           // cache: id -> settimana | null
   const [entries, setEntries] = useState([]);
+  const [done, setDone] = useState(() => new Set());   // blocchi completati (solo miei)
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState(null);
   const [tab, setTab] = useState("home");           // home | calendario | carica | bacheca
@@ -88,6 +89,24 @@ function Main() {
     const { data, error } = await supabase.from("scores").select("*");
     if (!error) setEntries((data || []).map(rowToEntry));
   };
+
+  // Blocchi segnati come completati: privati, filtrati per nome atleta
+  const loadDone = async (who) => {
+    if (!who) return;
+    const { data, error } = await supabase.from("workout_done").select("workout_id").eq("athlete", who);
+    if (!error) setDone(new Set((data || []).map(r => r.workout_id)));
+  };
+  useEffect(() => { loadDone(name); }, [name]);
+  const setBlockDone = async (w, on) => {
+    const had = done.has(w.id);
+    if (on === had) return;
+    setDone(p => { const n = new Set(p); on ? n.add(w.id) : n.delete(w.id); return n; });
+    const { error } = on
+      ? await supabase.from("workout_done").insert({ athlete: name, workout_id: w.id, week_id: w.id.split("__")[0] })
+      : await supabase.from("workout_done").delete().eq("athlete", name).eq("workout_id", w.id);
+    if (error && !/duplicate/i.test(error.message || "")) setDone(p => { const n = new Set(p); had ? n.add(w.id) : n.delete(w.id); return n; });
+  };
+  const toggleDone = (w) => setBlockDone(w, !done.has(w.id));
 
   useEffect(() => {
     let ch;
@@ -146,6 +165,7 @@ function Main() {
     const { data, error } = await supabase.from("scores").insert({ workout_id: wo.id, athlete: name, value, raw: raw.trim(), note: note.trim(), rx }).select().single();
     if (error) return "Punteggio non salvato: " + error.message;
     setEntries(p => p.some(x => x._key === data.id) ? p : [...p, rowToEntry(data)]);
+    setBlockDone(wo, true);   // registrare il punteggio = blocco completato
     return null;
   };
   const removeEntry = async (e) => {
@@ -173,8 +193,8 @@ function Main() {
   else if (tab === "calendario") body = <Calendario weekId={calWeek} week={calWeekData} dayKey={calDay} setDayKey={setCalDay}
     onShift={(d) => openWeek(shiftWeek(calWeek, d))} onToday={() => openWeek(thisWeek)}
     entries={entries} name={name} onAdd={addScore} onRemove={removeEntry} onEdit={() => setSub("edit")}
-    onUpload={(date) => { setUploadDate(date); setTab("carica"); }} onSetTimer={setBlockTimer} />;
-  else body = <Home name={name} week={weeks[thisWeek]} entries={entries} onOpenDay={goDay} onRename={rename}
+    onUpload={(date) => { setUploadDate(date); setTab("carica"); }} onSetTimer={setBlockTimer} done={done} onToggleDone={toggleDone} />;
+  else body = <Home name={name} week={weeks[thisWeek]} entries={entries} done={done} onToggleDone={toggleDone} onOpenDay={goDay} onRename={rename}
     onUpload={() => { setUploadDate(null); setTab("carica"); }} onBacheca={() => setTab("bacheca")} />;
 
   const go = (k) => { setSub(null); if (k === "carica") setUploadDate(null); if (k === "calendario" && tab !== "calendario") openWeek(thisWeek); setTab(k); };

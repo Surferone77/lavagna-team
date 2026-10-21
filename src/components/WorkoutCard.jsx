@@ -12,7 +12,7 @@ function Badge({ Icon, note }) {
     {note ? <NotebookPen size={19} color="#9a9a9a" /> : <Icon size={20} color={GREEN} strokeWidth={2.4} />}</div>;
 }
 
-export default function WorkoutCard({ w, name, date, entries, open, setOpen, onAdd, onRemove, onSetTimer }) {
+export default function WorkoutCard({ w, name, date, entries, open, setOpen, onAdd, onRemove, onSetTimer, done = false, onToggleDone }) {
   const [showHist, setShowHist] = useState(false);
   const [timer, setTimer] = useState(null);     // configurazione del timer in corso
   const [sheet, setSheet] = useState(false);    // scelta del timer aperta
@@ -26,12 +26,17 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
   const hasScaled = entries.some(e => !e.rx);
 
   return (
-    <div className="fade" style={{ background: CARD, border: `1px solid ${LINE}`, borderRadius: 20, marginBottom: 14, overflow: "hidden" }}>
+    <div className="fade" style={{ background: CARD, border: `1px solid ${done ? "rgba(184,255,44,0.55)" : LINE}`, transition: "border-color .3s", borderRadius: 20, marginBottom: 14, overflow: "hidden" }}>
       <div style={{ padding: isNote ? 16 : "16px 16px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Badge Icon={Icon} note={isNote} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            {<button onClick={() => setSheet(true)} aria-label="Apri timer per questo blocco" style={{ float: "right", marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(184,255,44,0.12)", color: GREEN, border: "1px solid rgba(184,255,44,0.3)", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}><TimerIcon size={14} /> Timer</button>}
+            <div style={{ float: "right", marginLeft: 8, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+            {onToggleDone && <button onClick={onToggleDone} aria-pressed={done} aria-label={done ? "Blocco completato, tocca per annullare" : "Segna il blocco come completato"}
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, background: done ? GREEN : "transparent", color: done ? "#0b0b0b" : "#cfcfcf", border: `1px solid ${done ? GREEN : "#444"}`, borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer", transition: "all .2s" }}>
+              <Check size={14} strokeWidth={3} /> {done ? "Fatto" : "Segna fatto"}</button>}
+            {<button onClick={() => setSheet(true)} aria-label="Apri timer per questo blocco" style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(184,255,44,0.12)", color: GREEN, border: "1px solid rgba(184,255,44,0.3)", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}><TimerIcon size={14} /> Timer</button>}
+            </div>
             <div style={{ color: "#fff", fontSize: 17.5, fontWeight: 800, lineHeight: 1.2, letterSpacing: -0.2 }}>{w.title}</div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, background: "#222", color: isNote ? MUTED : GREEN, fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 999 }}>
               {isNote ? (w.tag || "Nota · senza punteggio") : <><Icon size={12} /> {w.tag && w.tag.toLowerCase().includes(meta.label.toLowerCase()) ? w.tag : [w.tag, meta.label].filter(Boolean).join(" · ")}</>}
