@@ -121,6 +121,16 @@ function Main() {
     return null;
   };
 
+  // Salva il timer scelto su un singolo blocco (senza cambiare giorno o schermata)
+  const setBlockTimer = async (w, timer) => {
+    const [weekId, dayKey] = w.id.split("__");
+    const wk = weeksRef.current[weekId]; const day = wk?.days?.find(d => d.key === dayKey);
+    if (!day) return;
+    const workouts = day.workouts.map(x => x.id === w.id ? { ...x, timer } : x);
+    const { week, error } = await persistDay({ weekId, weekLabel: wk.label, dayKey, date: day.date, workouts });
+    if (!error) putWeek(week.id, week);
+  };
+
   const importWeek = async (raw) => {
     let data; try { data = JSON.parse(raw); } catch { return "JSON non valido."; }
     if (!data?.id || !Array.isArray(data.days)) return "Servono i campi id e days.";
@@ -163,7 +173,7 @@ function Main() {
   else if (tab === "calendario") body = <Calendario weekId={calWeek} week={calWeekData} dayKey={calDay} setDayKey={setCalDay}
     onShift={(d) => openWeek(shiftWeek(calWeek, d))} onToday={() => openWeek(thisWeek)}
     entries={entries} name={name} onAdd={addScore} onRemove={removeEntry} onEdit={() => setSub("edit")}
-    onUpload={(date) => { setUploadDate(date); setTab("carica"); }} />;
+    onUpload={(date) => { setUploadDate(date); setTab("carica"); }} onSetTimer={setBlockTimer} />;
   else body = <Home name={name} week={weeks[thisWeek]} entries={entries} onOpenDay={goDay} onRename={rename}
     onUpload={() => { setUploadDate(null); setTab("carica"); }} onBacheca={() => setTab("bacheca")} />;
 

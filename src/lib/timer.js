@@ -75,3 +75,49 @@ export function configFromWorkout(w) {
   }
   return null;
 }
+
+// Pulisce un timer salvato sul blocco (valori numerici validi e modalità nota)
+export function sanitizeTimer(t) {
+  if (!t || !MODES[t.mode]) return null;
+  const n = (v, min, max, d) => { const x = Math.round(Number(v)); return Number.isFinite(x) ? Math.min(max, Math.max(min, x)) : d; };
+  const o = { mode: t.mode };
+  if (t.mode === "fortime") o.cap = n(t.cap, 0, 180, 0);
+  if (t.mode === "amrap" || t.mode === "countdown") o.minutes = n(t.minutes, 1, 180, 10);
+  if (t.mode === "emom") { o.every = n(t.every, 5, 600, 60); o.rounds = n(t.rounds, 1, 200, 10); }
+  if (t.mode === "intervals") { o.work = n(t.work, 1, 3600, 20); o.rest = n(t.rest, 0, 3600, 10); o.rounds = n(t.rounds, 1, 200, 8); }
+  return o;
+}
+
+// Timer consigliato per un blocco: quello impostato sul blocco, altrimenti dedotto dal testo,
+// altrimenti un cronometro semplice.
+export function suggestTimer(w) {
+  const saved = sanitizeTimer(w.timer);
+  if (saved) return { cfg: saved, source: "blocco" };
+  const auto = configFromWorkout(w) || configFromText(w);
+  if (auto) return { cfg: auto, source: "auto" };
+  return { cfg: { mode: "fortime", cap: 0 }, source: "base" };
+}
+
+// Altri formati comuni: "Every 2:00 x 5", "Every 90 sec for 10 rounds", "On the minute x 8", "8 rounds: 30s on / 30s off"
+function configFromText(w) {
+  const txt = `${w.tag || ""}\n${w.detail || ""}`;
+  let m;
+  if ((m = txt.match(/every\s*(\d+)(?::(\d{2}))?\s*(min|'|sec|s|")?[^\n]*?(?:x|for)\s*(\d+)/i))) {
+    const unitSec = /sec|s|"/i.test(m[3] || "") && !m[2];
+    const every = m[2] ? Number(m[1]) * 60 + Number(m[2]) : unitSec ? Number(m[1]) : Number(m[1]) * 60;
+    return { mode: "emom", every, rounds: Number(m[4]) };
+  }
+  if ((m = txt.match(/on the minute[^\n]*?x\s*(\d+)/i))) return { mode: "emom", every: 60, rounds: Number(m[1]) };
+  if ((m = txt.match(/(\d+)\s*(?:rounds?|round|sets?)[^\n]*?(\d+)\s*(?:s|sec|")\s*(?:on|work|lavoro)[^\n]*?(\d+)\s*(?:s|sec|")\s*(?:off|rest|riposo)/i)))
+    return { mode: "intervals", rounds: Number(m[1]), work: Number(m[2]), rest: Number(m[3]) };
+  return null;
+}
+
+export function describeTimer(c) {
+  if (!c) return "";
+  if (c.mode === "fortime") return c.cap ? `Contare · time cap ${c.cap} min` : "Contare (cronometro)";
+  if (c.mode === "amrap") return `AMRAP ${c.minutes} min`;
+  if (c.mode === "countdown") return `Conto alla rovescia ${c.minutes} min`;
+  if (c.mode === "emom") return `EMOM ogni ${c.every >= 60 && c.every % 60 === 0 ? `${c.every / 60} min` : `${c.every} s`} × ${c.rounds}`;
+  return `${c.work}" lavoro – ${c.rest}" riposo × ${c.rounds}`;
+}

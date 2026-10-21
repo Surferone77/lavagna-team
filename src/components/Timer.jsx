@@ -64,7 +64,7 @@ function Row({ code, title, sub, open, onClick, children, extra }) {
 }
 
 // ---- Scelta e configurazione (dentro Utility) ----
-export function TimerSetup({ onStart }) {
+export function TimerSetup({ onStart, onAssign }) {
   const [openKey, setOpenKey] = useState(null);
   const [favs, setFavs] = useState(ls.get("timer:favs", []));
   const saveFavs = (f) => { setFavs(f); ls.set("timer:favs", f); };
@@ -75,14 +75,14 @@ export function TimerSetup({ onStart }) {
     <div>
       {LIST.map((r, i) => (
         <Row key={r.code} {...r} open={openKey === `l${i}`} onClick={() => setOpenKey(openKey === `l${i}` ? null : `l${i}`)}>
-          <Config initial={{ ...DEFAULTS, ...common, ...(base.mode === r.cfg.mode && !r.cfg.work ? base : {}), ...r.cfg }} onStart={onStart}
+          <Config initial={{ ...DEFAULTS, ...common, ...(base.mode === r.cfg.mode && !r.cfg.work ? base : {}), ...r.cfg }} onStart={onStart} onAssign={onAssign}
             onSave={(c, name) => { saveFavs([...favs, { ...c, name }]); setOpenKey(`f${favs.length}`); }} />
         </Row>
       ))}
       {favs.map((f, i) => (
         <Row key={`f${i}`} code={`P${(i + 1) % 10}`} title={f.name} sub={describe(f)} open={openKey === `f${i}`} onClick={() => setOpenKey(openKey === `f${i}` ? null : `f${i}`)}
           extra={<button onClick={() => onStart(f)} aria-label={`Avvia ${f.name}`} style={{ ...btnGreen, padding: "8px 11px", borderRadius: 10, flexShrink: 0 }}><Play size={14} fill="#0b0b0b" /></button>}>
-          <Config initial={f} onStart={onStart} favName={f.name}
+          <Config initial={f} onStart={onStart} onAssign={onAssign} favName={f.name}
             onSave={(c, name) => saveFavs(favs.map((x, k) => k === i ? { ...c, name } : x))}
             onDelete={() => { saveFavs(favs.filter((_, k) => k !== i)); setOpenKey(null); }} />
         </Row>
@@ -94,7 +94,7 @@ export function TimerSetup({ onStart }) {
   );
 }
 
-function Config({ initial, onStart, onSave, onDelete, favName }) {
+function Config({ initial, onStart, onSave, onDelete, favName, onAssign }) {
   const [c, setC] = useState(initial);
   const [name, setName] = useState(favName || "");
   const [naming, setNaming] = useState(false);
@@ -143,6 +143,7 @@ function Config({ initial, onStart, onSave, onDelete, favName }) {
         {!naming && <button onClick={() => setNaming(true)} style={{ ...pill, borderRadius: 14, padding: "0 14px", fontSize: 13 }}>{favName ? "Rinomina / salva" : "Salva"}</button>}
         {onDelete && <button onClick={onDelete} aria-label="Elimina timer" style={{ ...pill, borderRadius: 14, padding: "0 12px", color: "#ff8a8a" }}><Trash2 size={15} /></button>}
       </div>
+      {onAssign && <button onClick={() => onAssign(clean())} style={{ ...pill, width: "100%", marginTop: 8, padding: "10px 12px", borderRadius: 12, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><Check size={15} /> Imposta come timer di questo blocco</button>}
     </div>
   );
 }
@@ -289,3 +290,40 @@ export function TimerScreen({ config, title, onClose, onResult }) {
 
 const iconBtn = { background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", width: 38, height: 38, borderRadius: 19, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
 const ctrl = (bg, fg, size) => ({ width: size, height: size, borderRadius: size / 2, background: bg, color: fg, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" });
+
+// Scelta del timer per un blocco: timer consigliato in alto, tutte le modalità sotto
+export function TimerSheet({ w, suggestion, onStart, onAssign, onClose }) {
+  const [more, setMore] = useState(false);
+  const base = ls.get("timer:cfg", {});
+  const cfg = { ...DEFAULTS, prep: base.prep ?? 10, sound: base.sound ?? true, ...suggestion.cfg };
+  const src = { blocco: "Impostato su questo blocco", auto: "Dedotto dal testo del blocco", base: "Cronometro semplice (nessun formato riconosciuto)" }[suggestion.source];
+  return createPortal(
+    <div role="dialog" aria-label={`Timer per ${w.title}`} style={{ position: "fixed", inset: 0, zIndex: 65, background: "#0b0b0b", color: "#fff", fontFamily: FONT, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "max(14px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom))" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <button onClick={onClose} aria-label="Chiudi" style={iconBtn}><X size={20} /></button>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: MUTED, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6 }}>Timer per</div>
+            <div style={{ fontSize: 19, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.title}</div>
+          </div>
+        </div>
+        <div style={{ background: "linear-gradient(150deg, #1b2410 0%, #141414 60%)", border: "1px solid rgba(184,255,44,0.35)", borderRadius: 20, padding: 16, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <SevenSeg text={CODE[cfg.mode]} size={40} color={BLUE} off="rgba(47,134,255,0.08)" />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: GREEN, fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.6 }}>Timer consigliato</div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>{describe(cfg)}</div>
+              <div style={{ color: MUTED, fontSize: 12.5 }}>{src}</div>
+            </div>
+          </div>
+          <button onClick={() => onStart(cfg)} style={{ ...btnGreen, width: "100%", justifyContent: "center", padding: 15, fontSize: 17, borderRadius: 14, marginTop: 14 }}><Play size={18} fill="#0b0b0b" /> Avvia</button>
+        </div>
+        <button onClick={() => setMore(m => !m)} aria-expanded={more} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#141414", border: `1px solid ${LINE}`, color: "#fff", borderRadius: 14, padding: "13px 14px", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>
+          Scegli un altro timer <ChevronDown size={18} style={{ transform: more ? "rotate(180deg)" : "none" }} />
+        </button>
+        {more && <div style={{ marginTop: 6 }}><TimerSetup onStart={onStart} onAssign={onAssign} /></div>}
+      </div>
+    </div>,
+    document.body
+  );
+}

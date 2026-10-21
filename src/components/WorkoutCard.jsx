@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { TimerScreen } from "./Timer";
-import { configFromWorkout, DEFAULTS as TIMER_DEFAULTS } from "../lib/timer";
+import { TimerScreen, TimerSheet } from "./Timer";
+import { suggestTimer, sanitizeTimer } from "../lib/timer";
 import { Plus, Trophy, X, Check, Trash2, ChevronDown, ChevronUp, NotebookPen , Timer as TimerIcon } from "lucide-react";
 import PhotoStrip from "./PhotoStrip";
 import NotesSection from "./NotesSection";
@@ -12,15 +12,12 @@ function Badge({ Icon, note }) {
     {note ? <NotebookPen size={19} color="#9a9a9a" /> : <Icon size={20} color={GREEN} strokeWidth={2.4} />}</div>;
 }
 
-export default function WorkoutCard({ w, name, date, entries, open, setOpen, onAdd, onRemove }) {
+export default function WorkoutCard({ w, name, date, entries, open, setOpen, onAdd, onRemove, onSetTimer }) {
   const [showHist, setShowHist] = useState(false);
-  const [timer, setTimer] = useState(null);     // configurazione del timer aperto
+  const [timer, setTimer] = useState(null);     // configurazione del timer in corso
+  const [sheet, setSheet] = useState(false);    // scelta del timer aperta
   const [prefill, setPrefill] = useState(null); // tempo arrivato dal timer
-  const timerCfg = useMemo(() => configFromWorkout(w), [w]);
-  const openTimer = () => {
-    let saved = {}; try { saved = JSON.parse(localStorage.getItem("timer:cfg")) || {}; } catch { /* */ }
-    setTimer({ ...TIMER_DEFAULTS, prep: saved.prep ?? 10, sound: saved.sound ?? true, ...timerCfg });
-  };
+  const suggestion = useMemo(() => suggestTimer(w), [w]);
   const [division, setDivision] = useState("all");
   const isNote = w.type === "note";
   const meta = TYPE_META[w.type] || TYPE_META.time;
@@ -34,7 +31,7 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Badge Icon={Icon} note={isNote} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            {timerCfg && <button onClick={openTimer} aria-label="Apri timer per questo blocco" style={{ float: "right", marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(184,255,44,0.12)", color: GREEN, border: "1px solid rgba(184,255,44,0.3)", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}><TimerIcon size={14} /> Timer</button>}
+            {<button onClick={() => setSheet(true)} aria-label="Apri timer per questo blocco" style={{ float: "right", marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(184,255,44,0.12)", color: GREEN, border: "1px solid rgba(184,255,44,0.3)", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}><TimerIcon size={14} /> Timer</button>}
             <div style={{ color: "#fff", fontSize: 17.5, fontWeight: 800, lineHeight: 1.2, letterSpacing: -0.2 }}>{w.title}</div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, background: "#222", color: isNote ? MUTED : GREEN, fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 999 }}>
               {isNote ? (w.tag || "Nota · senza punteggio") : <><Icon size={12} /> {w.tag && w.tag.toLowerCase().includes(meta.label.toLowerCase()) ? w.tag : [w.tag, meta.label].filter(Boolean).join(" · ")}</>}
@@ -87,6 +84,9 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
             </div>))}</div>}
         </div>
       </>}
+      {sheet && <TimerSheet w={w} suggestion={suggestion} onClose={() => setSheet(false)}
+        onStart={(cfg) => { setSheet(false); setTimer(cfg); }}
+        onAssign={onSetTimer ? async (cfg) => { await onSetTimer(w, sanitizeTimer(cfg)); } : undefined} />}
       {timer && <TimerScreen config={timer} title={w.title} onClose={() => setTimer(null)}
         onResult={isNote ? undefined : (sec, isCap) => {
           setTimer(null);

@@ -1,3 +1,4 @@
+import { sanitizeTimer } from "./timer.js";
 // Settimane, giorni e id dei workout.
 export const DAY_ORDER = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"];
 export const DAY_LABEL = { lun: "Lunedì", mar: "Martedì", mer: "Mercoledì", gio: "Giovedì", ven: "Venerdì", sab: "Sabato", dom: "Domenica" };
@@ -54,7 +55,8 @@ const rid = () => Math.random().toString(36).slice(2, 8);
 
 export function cleanWorkout(w) {
   const type = ["time", "reps", "rounds", "weight", "note"].includes(w.type) ? w.type : "note";
-  return { ...(w.id ? { id: w.id } : {}), title: (w.title || "").trim() || "Senza titolo", tag: (w.tag || "").trim(), type, detail: (w.detail || "").trim() };
+  const timer = sanitizeTimer(w.timer);
+  return { ...(w.id ? { id: w.id } : {}), title: (w.title || "").trim() || "Senza titolo", tag: (w.tag || "").trim(), type, detail: (w.detail || "").trim(), ...(timer ? { timer } : {}) };
 }
 
 // Assegna id stabili: un workout con lo stesso titolo di prima mantiene il suo id,

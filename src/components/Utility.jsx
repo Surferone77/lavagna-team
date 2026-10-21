@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Percent, ArrowLeftRight, Timer as TimerIcon } from "lucide-react";
+import { Percent, ArrowLeftRight, Timer as TimerIcon, ChevronLeft } from "lucide-react";
 import { TimerSetup, TimerScreen } from "./Timer";
 import { GREEN, CARD, LINE, MUTED, inp, pill, pillOn, h1 } from "../lib/theme";
 
@@ -14,24 +14,45 @@ const roundTo = (n, step) => Math.round(n / step) * step;
 const box = { background: CARD, border: `1px solid ${LINE}`, borderRadius: 20, padding: 16, marginBottom: 14 };
 const head = { display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 17, fontWeight: 800, marginBottom: 12 };
 
+// Menu a riquadri: ogni strumento si apre nella sua pagina, così lo schermo resta pulito
+const TOOLS = [
+  { key: "timer", title: "Timer", sub: "For Time, AMRAP, EMOM, Tabata…", Icon: TimerIcon },
+  { key: "perc", title: "Percentuali", sub: "Dal 50% al 100% del massimale", Icon: Percent },
+  { key: "conv", title: "Libbre ⇄ chili", sub: "Conversione e pesi comuni", Icon: ArrowLeftRight },
+];
+
 export default function Utility() {
+  const [tool, setTool] = useState(null);
+  const [running, setRunning] = useState(null);
+  const t = TOOLS.find(x => x.key === tool);
+  if (t) return (
+    <div className="fade">
+      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0 16px" }}>
+        <button onClick={() => setTool(null)} aria-label="Torna a Utility" style={{ background: "#1c1c1c", border: `1px solid ${LINE}`, color: "#fff", width: 40, height: 40, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><ChevronLeft size={20} /></button>
+        <div style={{ ...h1, fontSize: 24 }}>{t.title}</div>
+      </div>
+      {tool === "timer" && <div style={box}><TimerSetup onStart={setRunning} /></div>}
+      {tool === "perc" && <Percentuali />}
+      {tool === "conv" && <Conversione />}
+      {running && <TimerScreen config={running} onClose={() => setRunning(null)} />}
+    </div>
+  );
   return (
     <div>
       <div style={{ ...h1, margin: "20px 0 16px" }}>Utility</div>
-      <TimerCard />
-      <Percentuali />
-      <Conversione />
-    </div>
-  );
-}
-
-function TimerCard() {
-  const [running, setRunning] = useState(null);
-  return (
-    <div style={box}>
-      <div style={head}><TimerIcon size={18} color={GREEN} /> Timer</div>
-      <TimerSetup onStart={setRunning} />
-      {running && <TimerScreen config={running} onClose={() => setRunning(null)} />}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {TOOLS.map(({ key, title, sub, Icon }, i) => (
+          <button key={key} onClick={() => setTool(key)} style={{ gridColumn: i === 0 ? "1 / -1" : "auto", textAlign: "left", background: i === 0 ? "linear-gradient(150deg, #1b2410 0%, #141414 60%)" : CARD, border: `1px solid ${i === 0 ? "rgba(184,255,44,0.35)" : LINE}`, borderRadius: 20, padding: 18, cursor: "pointer", display: "flex", flexDirection: i === 0 ? "row" : "column", alignItems: i === 0 ? "center" : "flex-start", gap: 14, minHeight: i === 0 ? 0 : 140 }}>
+            <span style={{ width: i === 0 ? 64 : 48, height: i === 0 ? 64 : 48, borderRadius: 16, background: "rgba(184,255,44,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon size={i === 0 ? 32 : 24} color={GREEN} strokeWidth={2.2} />
+            </span>
+            <span>
+              <span style={{ display: "block", color: "#fff", fontSize: i === 0 ? 21 : 16.5, fontWeight: 900 }}>{title}</span>
+              <span style={{ display: "block", color: MUTED, fontSize: 12.5, marginTop: 3 }}>{sub}</span>
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
