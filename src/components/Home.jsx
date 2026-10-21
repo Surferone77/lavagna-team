@@ -105,7 +105,7 @@ export default function Home({ name, week, entries, onOpenDay, onUpload, onBache
         {msgs.map(m => (
           <div key={m.id} style={{ padding: "5px 0" }}>
             <span style={{ color: GREEN, fontWeight: 700, fontSize: 13 }}>{m.utente} </span>
-            <span style={{ color: "#ddd", fontSize: 14 }}>{m.messaggio}</span>
+            <span style={{ color: "#ddd", fontSize: 14 }}>{m.messaggio || (m.allegato_nome ? `📎 ${m.allegato_nome}` : "")}</span>
           </div>
         ))}
         <button onClick={onBacheca} style={{ background: "none", border: "none", color: GREEN, fontSize: 13, fontWeight: 600, padding: "8px 0 0", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>Apri la bacheca <ChevronRight size={14} /></button>

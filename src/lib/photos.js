@@ -58,26 +58,21 @@ export async function deletePhoto(photo) {
   if (error) throw error;
 }
 
-// Scarica: sul telefono apre il pannello Condividi (→ "Salva immagine" nel rullino),
-// sul computer scarica il file.
+// Scarica la versione grande della foto (stessa logica degli allegati).
 export async function downloadPhoto(photo, filename) {
-  const res = await fetch(publicUrl(photo.path));
-  const blob = await res.blob();
-  const file = new File([blob], filename, { type: "image/jpeg" });
-  if (navigator.canShare?.({ files: [file] }) && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
-    try { await navigator.share({ files: [file], title: filename }); return; } catch (e) { if (e?.name === "AbortError") return; }
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  const { downloadFile } = await import("./files");
+  return downloadFile(publicUrl(photo.path), filename, "image/jpeg");
 }
 
+// Spazio usato da foto dei workout + allegati della bacheca
 export async function storageUsageMB() {
-  const { data, error } = await supabase.from("photos").select("bytes");
-  if (error) return null;
-  return (data || []).reduce((s, r) => s + (r.bytes || 0), 0) / (1024 * 1024);
+  const [p, a] = await Promise.all([
+    supabase.from("photos").select("bytes"),
+    supabase.from("comunicazioni").select("allegato_bytes"),
+  ]);
+  if (p.error) return null;
+  const sum = (rows, k) => (rows || []).reduce((s, r) => s + (r[k] || 0), 0);
+  return (sum(p.data, "bytes") + (a.error ? 0 : sum(a.data, "allegato_bytes"))) / (1024 * 1024);
 }
 
 export const safeName = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
