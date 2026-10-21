@@ -170,7 +170,7 @@ function Main() {
     <Shell>
       {loadErr && <div style={{ color: RED, fontSize: 13, marginTop: 12 }}>{loadErr}</div>}
       {body}
-      <div style={{ height: 90 }} />
+      <div style={{ height: "calc(90px + env(safe-area-inset-bottom))" }} />
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "rgba(14,14,14,0.92)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderTop: `1px solid ${LINE}`, paddingBottom: "env(safe-area-inset-bottom)", zIndex: 10 }}>
         <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", height: 64, padding: "0 8px" }}>
           {[["home", "Home", HomeIcon], ["calendario", "Calendario", CalendarDays], ["carica", "Carica", Camera], ["bacheca", "Bacheca", MessageSquare]].map(([k, l, I]) => {
@@ -191,7 +191,7 @@ function Main() {
 function Shell({ children }) {
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT, color: "#fff" }}>
-      <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 16px" }}>{children}</div>
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "env(safe-area-inset-top) 16px 0" }}>{children}</div>
     </div>
   );
 }

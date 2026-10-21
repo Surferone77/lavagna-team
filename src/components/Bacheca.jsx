@@ -36,7 +36,7 @@ export default function Bacheca({ name }) {
   };
 
   return (
-    <div style={{ paddingBottom: 140 }}>
+    <div style={{ paddingBottom: "calc(80px + env(safe-area-inset-bottom))" }}>
       <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 800, margin: "20px 0 14px" }}>Bacheca</h1>
       {loading && <div style={{ color: MUTED }}>Carico…</div>}
       {err && <div style={{ color: RED, fontSize: 13, marginBottom: 10 }}>{err}</div>}
@@ -54,7 +54,7 @@ export default function Bacheca({ name }) {
         );
       })}
       <div ref={endRef} />
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 64, background: BG, borderTop: `1px solid ${LINE}`, padding: "10px 16px" }}>
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: "calc(64px + env(safe-area-inset-bottom))", zIndex: 11, background: BG, borderTop: `1px solid ${LINE}`, padding: "10px 16px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", gap: 8 }}>
           <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder="Scrivi al team…" style={{ ...inp, flex: 1, minWidth: 0 }} />
           <button onClick={send} style={btnGreen} aria-label="Invia"><Send size={16} /></button>
