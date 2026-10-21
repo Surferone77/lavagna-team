@@ -85,21 +85,57 @@ function ScoreForm({ w, onAdd, onCancel }) {
   const meta = TYPE_META[w.type] || TYPE_META.time;
   const [raw, setRaw] = useState(""); const [note, setNote] = useState(""); const [rx, setRx] = useState(true);
   const [err, setErr] = useState(null); const [busy, setBusy] = useState(false);
+  // workout a tempo: minuti e secondi separati, oppure CAP + ripetizioni mancanti/fatte
+  const [mm, setMm] = useState(""); const [ss, setSs] = useState(""); const [cap, setCap] = useState(false); const [capReps, setCapReps] = useState("");
+  const isTime = w.type === "time";
+  const timeRaw = () => {
+    if (cap) return /^\d+$/.test(capReps) ? `CAP+${Number(capReps)}` : "";
+    if (mm === "" && ss === "") return "";
+    const m = Number(mm || 0), sec = Number(ss || 0);
+    if (!Number.isInteger(m) || !Number.isInteger(sec) || sec > 59 || m < 0 || sec < 0) return "";
+    return `${m}:${String(sec).padStart(2, "0")}`;
+  };
   const submit = async () => {
-    if (toValue(w.type, raw) === null) { setErr(formatHint(w.type)); return; }
+    const value = isTime ? timeRaw() : raw;
+    if (toValue(w.type, value) === null) { setErr(isTime ? (cap ? "Inserisci le ripetizioni fatte entro il time cap." : "Inserisci minuti e secondi (secondi 0–59).") : formatHint(w.type)); return; }
     setBusy(true);
-    const e = await onAdd(w, raw, note, rx);
+    const e = await onAdd(w, value, note, rx);
     setBusy(false);
     if (e) setErr(e);
   };
   return (
     <div style={{ marginTop: 12, padding: 14, background: "#1f1f1f", borderRadius: 12, border: `1px solid ${LINE}` }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      {isTime && (
+        <div>
+          {!cap ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input value={mm} onChange={e => { setMm(e.target.value.replace(/\D/g, "").slice(0, 3)); setErr(null); }} inputMode="numeric" placeholder="min" aria-label="Minuti" autoFocus
+                style={{ ...inp, width: 84, textAlign: "center", fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums" }} />
+              <span style={{ color: "#fff", fontSize: 24, fontWeight: 900 }}>:</span>
+              <input value={ss} onChange={e => { setSs(e.target.value.replace(/\D/g, "").slice(0, 2)); setErr(null); }} onKeyDown={e => e.key === "Enter" && submit()} inputMode="numeric" placeholder="sec" aria-label="Secondi"
+                style={{ ...inp, width: 84, textAlign: "center", fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums" }} />
+              <span style={{ color: MUTED, fontSize: 12.5, marginLeft: 4 }}>tempo finale</span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "#fff", fontWeight: 800 }}>CAP +</span>
+              <input value={capReps} onChange={e => { setCapReps(e.target.value.replace(/\D/g, "").slice(0, 4)); setErr(null); }} onKeyDown={e => e.key === "Enter" && submit()} inputMode="numeric" placeholder="reps" aria-label="Ripetizioni" autoFocus
+                style={{ ...inp, width: 100, textAlign: "center", fontSize: 20, fontWeight: 800 }} />
+              <span style={{ color: MUTED, fontSize: 12.5 }}>reps fatte</span>
+            </div>
+          )}
+          <label style={{ display: "flex", alignItems: "center", gap: 8, color: MUTED, fontSize: 13, marginTop: 10, cursor: "pointer" }}>
+            <input type="checkbox" checked={cap} onChange={e => { setCap(e.target.checked); setErr(null); }} style={{ accentColor: GREEN, width: 16, height: 16 }} />
+            Non ho finito entro il time cap
+          </label>
+        </div>
+      )}
+      {!isTime && <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <input value={raw} onChange={e => { setRaw(e.target.value); setErr(null); }} onKeyDown={e => e.key === "Enter" && submit()}
           placeholder={meta.placeholder} style={{ ...inp, flex: 1, minWidth: 0 }} autoFocus
           inputMode={w.type === "reps" || w.type === "weight" ? "decimal" : "text"} />
         {meta.unit && <span style={{ color: MUTED, fontSize: 13 }}>{meta.unit}</span>}
-      </div>
+      </div>}
       {err && <div style={{ color: RED, fontSize: 12, marginTop: 6 }}>{err}</div>}
       <input value={note} onChange={e => setNote(e.target.value)} placeholder="Nota (facoltativa): carico usato, scaling…" style={{ ...inp, marginTop: 8, width: "100%" }} />
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>

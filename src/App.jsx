@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Home as HomeIcon, CalendarDays, Camera, MessageSquare, Upload, X, Check, ChevronRight } from "lucide-react";
+import { Home as HomeIcon, CalendarDays, Camera, MessageSquare, Upload, X, Check, ChevronRight, Calculator } from "lucide-react";
 import { supabase, supabaseConfigured } from "./supabaseClient";
 import { GREEN, BG, CARD, LINE, MUTED, RED, FONT, inp, btnGreen, btnGhost } from "./lib/theme";
 import { AppIcon, ShieldMark, Wordmark } from "./components/Logo";
@@ -12,6 +12,7 @@ import Calendario from "./components/Calendario";
 import WorkoutEditor from "./components/WorkoutEditor";
 import UploadPanel from "./components/UploadPanel";
 import Bacheca from "./components/Bacheca";
+import Utility from "./components/Utility";
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -158,6 +159,7 @@ function Main() {
   else if (tab === "carica") body = <UploadPanel key={uploadDate || "oggi"} initialDate={uploadDate} currentWeek={weeks[weekInfo(uploadDate || todayISO()).weekId]}
     onAdd={saveDay} onCancel={() => setTab("home")} onImportJson={() => setSub("import")} />;
   else if (tab === "bacheca") body = <Bacheca name={name} />;
+  else if (tab === "utility") body = <Utility />;
   else if (tab === "calendario") body = <Calendario weekId={calWeek} week={calWeekData} dayKey={calDay} setDayKey={setCalDay}
     onShift={(d) => openWeek(shiftWeek(calWeek, d))} onToday={() => openWeek(thisWeek)}
     entries={entries} name={name} onAdd={addScore} onRemove={removeEntry} onEdit={() => setSub("edit")}
@@ -173,11 +175,11 @@ function Main() {
       <div style={{ height: "calc(90px + env(safe-area-inset-bottom))" }} />
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "rgba(14,14,14,0.92)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderTop: `1px solid ${LINE}`, paddingBottom: "env(safe-area-inset-bottom)", zIndex: 10 }}>
         <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", height: 64, padding: "0 8px" }}>
-          {[["home", "Home", HomeIcon], ["calendario", "Calendario", CalendarDays], ["carica", "Carica", Camera], ["bacheca", "Bacheca", MessageSquare]].map(([k, l, I]) => {
+          {[["home", "Home", HomeIcon], ["calendario", "Calendario", CalendarDays], ["carica", "Carica", Camera], ["bacheca", "Bacheca", MessageSquare], ["utility", "Utility", Calculator]].map(([k, l, I]) => {
             const on = tab === k;
             return (
               <button key={k} onClick={() => go(k)} style={{ flex: 1, background: "none", border: "none", color: on ? GREEN : MUTED, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontSize: 10.5, fontWeight: 800, cursor: "pointer", letterSpacing: 0.2 }}>
-                <span style={{ width: 52, height: 30, borderRadius: 15, display: "flex", alignItems: "center", justifyContent: "center", background: on ? "rgba(184,255,44,0.14)" : "transparent", transition: "background .2s" }}><I size={20} strokeWidth={on ? 2.4 : 2} /></span>
+                <span style={{ width: 46, height: 30, borderRadius: 15, display: "flex", alignItems: "center", justifyContent: "center", background: on ? "rgba(184,255,44,0.14)" : "transparent", transition: "background .2s" }}><I size={20} strokeWidth={on ? 2.4 : 2} /></span>
                 {l}
               </button>
             );
