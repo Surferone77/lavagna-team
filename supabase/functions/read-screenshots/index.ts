@@ -28,7 +28,7 @@ Regole:
   - "rounds" -> AMRAP con punteggio in round + reps
   - "weight" -> build to heavy, xRM, max load, 1RM
   - "note"   -> lavoro tecnico, accessori a RPE, mobilità, warm-up, corsa facile: nessun punteggio confrontabile
-- timer: proponi il timer giusto quando il formato lo permette. For Time → fortime (cap in minuti se c'è un time cap); AMRAP N → amrap minutes N; EMOM N / Every X min for N → emom (every in secondi, rounds); Tabata o lavoro/riposo a round → intervals; lavoro a RPE o tecnico senza tempo → ometti timer.
+- timer: proponi il timer giusto quando il formato lo permette. For Time → fortime (cap in minuti se c'è un time cap); AMRAP N → amrap minutes N; EMOM N / Every X min for N → emom (every in secondi, rounds); Tabata o lavoro/riposo a round → intervals; workout con più parti a tempo di fila (es. 5 min warm-up jog, poi 12 sets 1:30 lavoro / 25 sec riposo, poi 5 min warm-down) → sequence con parts nell'ordine: "tempo" (label, sec) per tratti a tempo, "intervalli" (label, work, rest, rounds) per i set, "riposo" (sec) per pause; lavoro a RPE o tecnico senza tempo → ometti timer.
 - Il programma deve valere per TUTTO il team: escludi qualunque dato personale di chi ha fatto lo screenshot o di altri atleti/coach.
   Quindi NON riportare: nomi di persone, avatar, punteggi o risultati registrati (tempi, reps, carichi segnati da qualcuno), posizioni in classifica, commenti, like, note personali, "Your score", "PR".
   Riporta solo la prescrizione dell'allenamento (cosa fare), non cosa ha fatto qualcuno.
@@ -56,13 +56,29 @@ const TOOL = {
               type: "object",
               description: "Timer adatto al blocco, se il formato lo indica",
               properties: {
-                mode: { type: "string", enum: ["fortime", "amrap", "emom", "intervals", "countdown"] },
+                mode: { type: "string", enum: ["fortime", "amrap", "emom", "intervals", "countdown", "sequence"] },
                 minutes: { type: "integer", description: "durata in minuti (amrap, countdown)" },
                 cap: { type: "integer", description: "time cap in minuti (fortime), 0 se assente" },
                 every: { type: "integer", description: "secondi per intervallo (emom)" },
                 rounds: { type: "integer", description: "numero di round (emom, intervals)" },
                 work: { type: "integer", description: "secondi di lavoro (intervals)" },
                 rest: { type: "integer", description: "secondi di riposo (intervals)" },
+                parts: {
+                  type: "array",
+                  description: "solo per sequence: le parti in ordine",
+                  items: {
+                    type: "object",
+                    properties: {
+                      type: { type: "string", enum: ["tempo", "intervalli", "riposo"] },
+                      label: { type: "string", description: "nome breve, es. Warm-up jog, Threshold Row" },
+                      sec: { type: "integer", description: "durata in secondi (tempo, riposo)" },
+                      work: { type: "integer", description: "secondi di lavoro per set (intervalli)" },
+                      rest: { type: "integer", description: "secondi di riposo tra i set (intervalli)" },
+                      rounds: { type: "integer", description: "numero di set (intervalli)" },
+                    },
+                    required: ["type"],
+                  },
+                },
               },
               required: ["mode"],
             },

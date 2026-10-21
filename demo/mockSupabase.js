@@ -20,6 +20,7 @@ const week = {
       { title: "Applied Strength", tag: "4 sets", type: "note", detail: "10 reps, each Seated KB Calf Raise 6/10 RPE\n60-sec Dball Bottom of squat hold 100/70#\n25 reps Wt'd GHD Back Extension 6/10 RPE" },
       { title: "Metcon", tag: "AMRAP 14", type: "rounds", detail: "200m Run\n12 Burpee Box Jump Over\n16 KB Swing 24/16 kg" },
       { title: "Sled Finisher", tag: "For Time", type: "time", detail: "4x 25m Sled Push\n4x 25m Sled Pull\nTime cap 6'" },
+      { title: "Gross Conditioning - MACHINE THRESHOLD", tag: "12 sets", type: "note", detail: "5 min warm-up jog\n\n12 sets:\n1 min 30-sec Threshold Row\n25-sec rest between sets\n\n5 min warm-down jog" },
     ]),
   ].filter((d, i, a) => a.findIndex(x => x.key === d.key) === i),
 };

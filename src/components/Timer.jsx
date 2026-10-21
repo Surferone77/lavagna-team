@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Play, Pause, RotateCcw, X, Volume2, VolumeX, Plus, Check, Trash2, ChevronDown } from "lucide-react";
-import { MODES, DEFAULTS, buildSegments, stateAt, totalDuration, fmtClock } from "../lib/timer";
+import { Play, Pause, RotateCcw, X, Volume2, VolumeX, Plus, Check, Trash2, ChevronDown, ArrowUp, ArrowDown } from "lucide-react";
+import { MODES, DEFAULTS, DEFAULT_PARTS, PART_TYPES, buildSegments, stateAt, totalDuration, fmtClock, sanitizeTimer, sequenceTotal } from "../lib/timer";
 import SevenSeg from "./SevenSeg";
 import { GREEN, LINE, MUTED, FONT, inp, pill, pillOn, btnGreen } from "../lib/theme";
 
@@ -41,8 +41,9 @@ const LIST = [
   { code: "En", title: "EMOM", sub: "Un intervallo ogni N secondi", cfg: { mode: "emom" } },
   { code: "H1", title: "Intervalli", sub: "Lavoro / riposo per N round", cfg: { mode: "intervals" } },
   { code: "tb", title: "Tabata", sub: "8 round · 20\" lavoro – 10\" riposo", cfg: { mode: "intervals", work: 20, rest: 10, rounds: 8 } },
+  { code: "SE", title: "Sequenza", sub: "Tutto il workout di fila: warm-up, intervalli, riposi", cfg: { mode: "sequence" } },
 ];
-const CODE = { fortime: "UP", countdown: "dn", amrap: "AP", emom: "En", intervals: "H1" };
+const CODE = { fortime: "UP", countdown: "dn", amrap: "AP", emom: "En", intervals: "H1", sequence: "SE" };
 
 function Row({ code, title, sub, open, onClick, children, extra }) {
   return (
@@ -75,7 +76,7 @@ export function TimerSetup({ onStart, onAssign }) {
     <div>
       {LIST.map((r, i) => (
         <Row key={r.code} {...r} open={openKey === `l${i}`} onClick={() => setOpenKey(openKey === `l${i}` ? null : `l${i}`)}>
-          <Config initial={{ ...DEFAULTS, ...common, ...(base.mode === r.cfg.mode && !r.cfg.work ? base : {}), ...r.cfg }} onStart={onStart} onAssign={onAssign}
+          <Config initial={{ ...DEFAULTS, ...common, ...(base.mode === r.cfg.mode && !r.cfg.work ? base : {}), ...r.cfg, ...(r.cfg.mode === "sequence" ? { parts: base.mode === "sequence" && base.parts?.length ? base.parts : DEFAULT_PARTS } : {}) }} onStart={onStart} onAssign={onAssign}
             onSave={(c, name) => { saveFavs([...favs, { ...c, name }]); setOpenKey(`f${favs.length}`); }} />
         </Row>
       ))}
@@ -103,6 +104,7 @@ function Config({ initial, onStart, onSave, onDelete, favName, onAssign }) {
     const o = { ...c };
     for (const k of ["minutes", "every", "rounds", "work"]) o[k] = Math.max(1, Number(o[k]) || 1);
     for (const k of ["cap", "rest"]) o[k] = Math.max(0, Number(o[k]) || 0);
+    if (o.mode === "sequence") o.parts = sanitizeTimer(o)?.parts || DEFAULT_PARTS;
     return o;
   };
   const num = (key, label, unit, min = 1, max = 999) => (
@@ -125,6 +127,7 @@ function Config({ initial, onStart, onSave, onDelete, favName, onAssign }) {
         {c.mode === "emom" && <>{num("every", "Ogni", "sec", 5, 600)}{num("rounds", "Round", "×", 1, 200)}</>}
         {c.mode === "intervals" && <>{num("work", "Lavoro", "sec", 1, 3600)}{num("rest", "Riposo", "sec", 0, 3600)}{num("rounds", "Round", "×", 1, 200)}</>}
       </div>
+      {c.mode === "sequence" && <div style={{ marginBottom: 12 }}><SequenceEditor parts={c.parts || DEFAULT_PARTS} onChange={(parts) => set({ parts })} /></div>}
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         <span style={{ color: MUTED, fontSize: 12.5 }}>Via dopo</span>
         {[0, 5, 10].map(s => <button key={s} onClick={() => set({ prep: s })} style={{ ...pill, padding: "4px 11px", ...(c.prep === s ? pillOn : {}) }}>{s ? `${s} s` : "subito"}</button>)}
@@ -150,6 +153,7 @@ function Config({ initial, onStart, onSave, onDelete, favName, onAssign }) {
 
 function describe(c) {
   const prep = c.prep ? ` · via dopo ${c.prep}s` : "";
+  if (c.mode === "sequence") return `Sequenza · ${c.parts?.length || 0} parti · ${fmtClock(sequenceTotal(c))}${prep}`;
   if (c.mode === "fortime") return `Contare${c.cap ? ` · cap ${c.cap} min` : ""}${prep}`;
   if (c.mode === "amrap") return `AMRAP ${c.minutes} min${prep}`;
   if (c.mode === "countdown") return `Conto alla rovescia ${c.minutes} min${prep}`;
@@ -233,6 +237,8 @@ export function TimerScreen({ config, title, onClose, onResult }) {
   else clock = fmtClock(seg.up ? st.inSeg : st.remaining);
   const size = useDigitSize(clock.replace(":", "").length + 0.6);
 
+  const isSeq = config.mode === "sequence";
+  const paused = !running && !notStarted && !st.done && resultSec === null;
   const phase = st.done ? (isForTime && stopped === null && config.cap ? "Time cap" : "Fine") : notStarted ? "Pronto" : seg.kind === "prep" ? "Preparati" : seg.kind === "rest" ? "Riposo" : seg.up ? "Via!" : "Lavoro";
   const roundText = seg.rounds > 0 ? String(Math.min(seg.round, 99)).padStart(2, "0") : config.mode === "amrap" ? String(Math.min(rounds, 99)).padStart(2, "0") : "--";
 
@@ -245,6 +251,7 @@ export function TimerScreen({ config, title, onClose, onResult }) {
           <SevenSeg text="r" size={30} color={GREEN} off="rgba(184,255,44,0.06)" />
           <SevenSeg text={roundText} size={30} color={GREEN} off="rgba(184,255,44,0.06)" label={`Round ${roundText}`} />
           {seg.rounds > 0 && <span style={{ color: MUTED, fontSize: 13, fontWeight: 700 }}>/ {seg.rounds}</span>}
+          {isSeq && (seg.part || segs[1]?.part) && <span style={{ color: MUTED, fontSize: 12, fontWeight: 700, marginLeft: 4 }}>P{seg.part || segs[1].part}/{(seg.parts || segs[1].parts)}</span>}
         </div>
         <div style={{ flex: 1, minWidth: 0, textAlign: "right", color: MUTED, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title || describe(config)}</div>
         <button onClick={() => setSound(s => !s)} aria-label={sound ? "Disattiva suono" : "Attiva suono"} style={iconBtn}>{sound ? <Volume2 size={19} /> : <VolumeX size={19} />}</button>
@@ -253,11 +260,20 @@ export function TimerScreen({ config, title, onClose, onResult }) {
 
       {/* orologio */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: size * 0.12 }}>
-        <div style={{ opacity: blinkOff ? 0.35 : 1, transition: "opacity .08s" }}>
+        <div onClick={() => { if (st.done) return; running ? pause() : play(); }} title={running ? "Tocca per mettere in pausa" : "Tocca per avviare"}
+          style={{ opacity: blinkOff ? 0.35 : 1, transition: "opacity .08s", cursor: "pointer" }}>
           <SevenSeg text={clock} size={size} color={color} off="rgba(255,255,255,0.045)" label={clock} />
         </div>
-        <div style={{ color, fontWeight: 900, fontSize: Math.max(14, size * 0.16), letterSpacing: 4, textTransform: "uppercase" }}>{phase}</div>
-        {(config.mode === "emom" || config.mode === "intervals") && !notStarted && (
+        <div style={{ color, fontWeight: 900, fontSize: Math.max(14, size * 0.16), letterSpacing: 4, textTransform: "uppercase" }}>{paused ? "Pausa" : phase}</div>
+        {isSeq && (() => {
+          const cur = seg.kind === "prep" ? segs[1] : seg;
+          const next = st.done ? null : segs[(seg.kind === "prep" ? 1 : st.i) + 1];
+          return <div style={{ textAlign: "center", lineHeight: 1.35 }}>
+            {cur && !st.done && <div style={{ color: "#fff", fontSize: Math.max(15, size * 0.13), fontWeight: 800 }}>{cur.partLabel} <span style={{ color: MUTED, fontWeight: 700, fontSize: "0.8em" }}>· parte {cur.part}/{cur.parts}</span></div>}
+            {next && <div style={{ color: MUTED, fontSize: 13.5 }}>Poi: {next.kind === "rest" ? "Riposo" : next.label} {fmtClock(next.dur)}</div>}
+          </div>;
+        })()}
+        {(config.mode === "emom" || config.mode === "intervals" || isSeq) && !notStarted && (
           <div style={{ color: MUTED, fontSize: 13 }}>Totale {fmtClock(st.workElapsed)}{total ? ` / ${fmtClock(total - (segs[0]?.kind === "prep" ? segs[0].dur : 0))}` : ""}</div>
         )}
         {isForTime && config.cap > 0 && <div style={{ color: MUTED, fontSize: 13 }}>Time cap {config.cap}:00</div>}
@@ -327,3 +343,60 @@ export function TimerSheet({ w, suggestion, onStart, onAssign, onClose }) {
     document.body
   );
 }
+
+// ---- Editor della sequenza: parti in fila, ognuna a tempo, a intervalli o di riposo ----
+const sec2 = (t) => ({ m: Math.floor((t || 0) / 60), s: (t || 0) % 60 });
+function MinSec({ value, onChange, label }) {
+  const { m, s } = sec2(value);
+  const f = (v) => String(v).replace(/\D/g, "").slice(0, 3);
+  const box = { ...inp, width: 46, padding: "7px 4px", textAlign: "center", fontSize: 15, fontWeight: 800 };
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+      <input value={m} inputMode="numeric" aria-label={`${label} minuti`} onChange={e => onChange(Number(f(e.target.value) || 0) * 60 + s)} style={box} />
+      <b style={{ color: MUTED }}>:</b>
+      <input value={String(s).padStart(2, "0")} inputMode="numeric" aria-label={`${label} secondi`} onChange={e => onChange(m * 60 + Math.min(59, Number(f(e.target.value).slice(-2) || 0)))} style={box} />
+    </span>
+  );
+}
+const small = { color: MUTED, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 };
+
+export function SequenceEditor({ parts, onChange }) {
+  const set = (i, p) => onChange(parts.map((x, k) => k === i ? { ...x, ...p } : x));
+  const move = (i, d) => { const j = i + d; if (j < 0 || j >= parts.length) return; const a = [...parts]; [a[i], a[j]] = [a[j], a[i]]; onChange(a); };
+  const add = (type) => onChange([...parts, type === "intervalli" ? { type, label: "Lavoro", work: 60, rest: 20, rounds: 5 } : type === "riposo" ? { type, label: "Riposo", sec: 60 } : { type, label: "Corsa", sec: 300 }]);
+  const total = sequenceTotal({ mode: "sequence", parts: sanitizeTimer({ mode: "sequence", parts })?.parts || [] });
+  return (
+    <div>
+      {parts.map((p, i) => (
+        <div key={i} style={{ background: "#101010", border: `1px solid ${LINE}`, borderLeft: `3px solid ${p.type === "riposo" ? BLUE : p.type === "intervalli" ? GREEN : "#888"}`, borderRadius: 12, padding: 10, marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <span style={{ color: MUTED, fontSize: 12, fontWeight: 800, width: 16 }}>{i + 1}</span>
+            <select value={p.type} aria-label="Tipo di parte" onChange={e => { const t = e.target.value; set(i, t === "intervalli" ? { type: t, work: p.work || p.sec || 60, rest: p.rest ?? 20, rounds: p.rounds || 5 } : { type: t, sec: p.sec || p.work || 60 }); }}
+              style={{ ...inp, padding: "6px 6px", fontSize: 13 }}>
+              {Object.entries(PART_TYPES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+            <input value={p.label} onChange={e => set(i, { label: e.target.value.slice(0, 40) })} placeholder="Nome (es. Warm-up)" aria-label="Nome della parte" style={{ ...inp, flex: 1, minWidth: 0, padding: "6px 8px", fontSize: 14 }} />
+            <button onClick={() => move(i, -1)} aria-label="Sposta su" style={mini}><ArrowUp size={13} /></button>
+            <button onClick={() => move(i, 1)} aria-label="Sposta giù" style={mini}><ArrowDown size={13} /></button>
+            <button onClick={() => onChange(parts.filter((_, k) => k !== i))} aria-label="Togli parte" style={{ ...mini, color: "#ff8a8a" }}><Trash2 size={13} /></button>
+          </div>
+          {p.type === "intervalli"
+            ? <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", paddingLeft: 22 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={small}>Set</span>
+                  <input value={p.rounds} inputMode="numeric" aria-label="Numero di set" onChange={e => set(i, { rounds: Number(e.target.value.replace(/\D/g, "").slice(0, 3)) || "" })} style={{ ...inp, width: 48, padding: "7px 4px", textAlign: "center", fontSize: 15, fontWeight: 800 }} /></label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={small}>Lavoro</span><MinSec value={p.work} label="Lavoro" onChange={v => set(i, { work: v })} /></label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={small}>Riposo</span><MinSec value={p.rest} label="Riposo" onChange={v => set(i, { rest: v })} /></label>
+              </div>
+            : <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 22 }}><span style={small}>Durata</span><MinSec value={p.sec} label="Durata" onChange={v => set(i, { sec: v })} /></div>}
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <button onClick={() => add("tempo")} style={{ ...pill, padding: "6px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}><Plus size={13} /> Tempo</button>
+        <button onClick={() => add("intervalli")} style={{ ...pill, padding: "6px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}><Plus size={13} /> Intervalli</button>
+        <button onClick={() => add("riposo")} style={{ ...pill, padding: "6px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}><Plus size={13} /> Riposo</button>
+        <span style={{ marginLeft: "auto", color: "#fff", fontWeight: 800, fontSize: 14 }}>Totale {fmtClock(total)}</span>
+      </div>
+    </div>
+  );
+}
+const mini = { background: "#1b1b1b", border: `1px solid ${LINE}`, color: "#ddd", width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0 };

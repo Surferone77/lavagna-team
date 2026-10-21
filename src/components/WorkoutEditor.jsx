@@ -1,6 +1,7 @@
 import { ArrowUp, ArrowDown, Trash2, Plus } from "lucide-react";
 import { TYPES, TYPE_LABEL } from "../lib/scoring";
-import { suggestTimer, describeTimer } from "../lib/timer";
+import { suggestTimer, describeTimer, DEFAULT_PARTS } from "../lib/timer";
+import { SequenceEditor } from "./Timer";
 import { CARD, LINE, MUTED, inp, btnGhost, lbl } from "../lib/theme";
 
 // Lista di card modificabili: titolo, formato, tipo di punteggio, testo.
@@ -44,9 +45,9 @@ export default function WorkoutEditor({ workouts, onChange }) {
 }
 
 // Timer del blocco: automatico (dedotto dal testo) oppure scelto a mano
-const T_MODES = [["", "Automatico"], ["fortime", "Contare"], ["countdown", "Conto alla rovescia"], ["amrap", "AMRAP"], ["emom", "EMOM"], ["intervals", "Intervalli"]];
+const T_MODES = [["", "Automatico"], ["fortime", "Contare"], ["countdown", "Conto alla rovescia"], ["amrap", "AMRAP"], ["emom", "EMOM"], ["intervals", "Intervalli"], ["sequence", "Sequenza"]];
 const T_FIELDS = { fortime: [["cap", "cap min"]], countdown: [["minutes", "min"]], amrap: [["minutes", "min"]], emom: [["every", "ogni s"], ["rounds", "round"]], intervals: [["work", "lavoro s"], ["rest", "riposo s"], ["rounds", "round"]] };
-const T_DEF = { fortime: { cap: 0 }, countdown: { minutes: 10 }, amrap: { minutes: 12 }, emom: { every: 60, rounds: 10 }, intervals: { work: 20, rest: 10, rounds: 8 } };
+const T_DEF = { fortime: { cap: 0 }, countdown: { minutes: 10 }, amrap: { minutes: 12 }, emom: { every: 60, rounds: 10 }, intervals: { work: 20, rest: 10, rounds: 8 }, sequence: { parts: DEFAULT_PARTS } };
 
 function TimerField({ w, onChange }) {
   const t = w.timer;
@@ -54,11 +55,12 @@ function TimerField({ w, onChange }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
       <span style={{ ...lbl, marginBottom: 0 }}>Timer</span>
-      <select value={t?.mode || ""} onChange={e => onChange(e.target.value ? { mode: e.target.value, ...T_DEF[e.target.value] } : undefined)} aria-label="Timer del blocco"
+      <select value={t?.mode || ""} onChange={e => onChange(e.target.value ? { mode: e.target.value, ...T_DEF[e.target.value], ...(e.target.value === "sequence" && auto?.cfg?.mode === "sequence" ? { parts: auto.cfg.parts } : {}) } : undefined)} aria-label="Timer del blocco"
         style={{ ...inp, padding: "6px 8px", fontSize: 14 }}>
         {T_MODES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
       </select>
-      {t ? T_FIELDS[t.mode].map(([k, l]) => (
+      {t?.mode === "sequence" ? <div style={{ width: "100%" }}><SequenceEditor parts={t.parts || DEFAULT_PARTS} onChange={(parts) => onChange({ ...t, parts })} /></div>
+      : t ? T_FIELDS[t.mode].map(([k, l]) => (
         <label key={k} style={{ display: "inline-flex", alignItems: "center", gap: 4, color: MUTED, fontSize: 12 }}>
           <input value={t[k] ?? ""} inputMode="numeric" aria-label={l} onChange={e => onChange({ ...t, [k]: e.target.value.replace(/\D/g, "").slice(0, 4) })}
             style={{ ...inp, width: 58, padding: "6px 6px", textAlign: "center", fontSize: 14 }} />{l}
