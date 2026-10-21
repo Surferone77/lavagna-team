@@ -63,7 +63,7 @@ export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, o
         </div>
       )}
       {day?.workouts.map(w => (
-        <WorkoutCard key={w.id} w={w} name={name} entries={entries.filter(e => e.wod === w.id)}
+        <WorkoutCard key={w.id} w={w} name={name} date={date} entries={entries.filter(e => e.wod === w.id)}
           open={openForm === w.id} setOpen={o => setOpenForm(o ? w.id : null)} onAdd={async (...a) => { const e = await onAdd(...a); if (!e) setOpenForm(null); return e; }} onRemove={onRemove} />
       ))}
       {day && day.workouts.length === 0 && <div style={{ color: MUTED, padding: 16 }}>Giorno di riposo.</div>}

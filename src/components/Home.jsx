@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Camera, ChevronRight, MessageSquare, Trophy, Flame } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import { storageUsageMB, PHOTO_LIMITS } from "../lib/photos";
 import { display, TYPE_META } from "../lib/scoring";
 import { DAY_LABEL, weekInfo, todayISO, prettyDate } from "../lib/weeks";
 import { GREEN, CARD, LINE, MUTED, btnGreen, h1 } from "../lib/theme";
@@ -25,6 +26,7 @@ const h = { color: MUTED, fontSize: 12, fontWeight: 700, textTransform: "upperca
 
 export default function Home({ name, week, entries, onOpenDay, onUpload, onBacheca, onRename }) {
   const [msgs, setMsgs] = useState([]);
+  const [usage, setUsage] = useState(null);
   const today = todayISO();
   const info = weekInfo(today);
   const todayDay = week?.days?.find(d => d.key === info.dayKey);
@@ -32,6 +34,7 @@ export default function Home({ name, week, entries, onOpenDay, onUpload, onBache
   useEffect(() => {
     supabase.from("comunicazioni").select("*").order("created_at", { ascending: false }).limit(2)
       .then(({ data }) => setMsgs(data || []));
+    storageUsageMB().then(setUsage);
   }, []);
 
   // Statistiche della settimana corrente
@@ -107,6 +110,9 @@ export default function Home({ name, week, entries, onOpenDay, onUpload, onBache
         ))}
         <button onClick={onBacheca} style={{ background: "none", border: "none", color: GREEN, fontSize: 13, fontWeight: 600, padding: "8px 0 0", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>Apri la bacheca <ChevronRight size={14} /></button>
       </div>
+      {usage !== null && <div style={{ color: "#5c5c5c", fontSize: 11.5, textAlign: "center", marginTop: 6 }}>
+        Spazio foto del team: {usage < 1 ? "<1" : Math.round(usage)} MB su {PHOTO_LIMITS.freeQuotaMB / 1024} GB gratuiti
+      </div>}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Plus, Trophy, X, Check, Trash2, ChevronDown, ChevronUp, NotebookPen } from "lucide-react";
+import PhotoStrip from "./PhotoStrip";
 import { TYPE_META, toValue, display, formatHint, buildBoard } from "../lib/scoring";
 import { GREEN, CARD, LINE, MUTED, RED, inp, btnGreen, btnGhost, btnTextMuted, pill, pillOn } from "../lib/theme";
 
@@ -8,7 +9,7 @@ function Badge({ Icon, note }) {
     {note ? <NotebookPen size={19} color="#9a9a9a" /> : <Icon size={20} color={GREEN} strokeWidth={2.4} />}</div>;
 }
 
-export default function WorkoutCard({ w, name, entries, open, setOpen, onAdd, onRemove }) {
+export default function WorkoutCard({ w, name, date, entries, open, setOpen, onAdd, onRemove }) {
   const [showHist, setShowHist] = useState(false);
   const [division, setDivision] = useState("all");
   const isNote = w.type === "note";
@@ -30,6 +31,7 @@ export default function WorkoutCard({ w, name, entries, open, setOpen, onAdd, on
           </div>
         </div>
         <pre style={{ color: "#dcdcdc", fontSize: 15, lineHeight: 1.55, whiteSpace: "pre-wrap", fontFamily: "inherit", margin: "14px 0 0" }}>{w.detail}</pre>
+        <PhotoStrip w={w} name={name} date={date} />
       </div>
 
       {!isNote && <>

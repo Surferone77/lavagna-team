@@ -52,6 +52,7 @@ const db = {
 };
 
 const listeners = [];
+const files = {}; // storage finto: percorso -> URL locale
 const notify = (table, row) => listeners.filter(l => l.table === table).forEach(l => setTimeout(() => l.cb({ new: row }), 0));
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
@@ -101,7 +102,13 @@ export const supabase = {
     return ch;
   },
   removeChannel() {},
-  storage: { from: () => ({ upload: async () => ({ data: {}, error: null }) }) },
+  storage: {
+    from: () => ({
+      upload: async (path, blob) => { files[path] = URL.createObjectURL(blob); return { data: { path }, error: null }; },
+      getPublicUrl: (path) => ({ data: { publicUrl: files[path] || "" } }),
+      remove: async (paths) => { paths.forEach(p => delete files[p]); return { data: null, error: null }; },
+    }),
+  },
 };
 
 // Lettura AI simulata. Il primo screenshot restituisce le card del vero screenshot SugarWOD;
