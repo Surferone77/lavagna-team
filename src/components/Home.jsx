@@ -24,8 +24,8 @@ export default function Home({ name, week, entries, done: doneSet = new Set(), o
   const todayDay = week?.days?.find(d => d.key === info.dayKey);
 
   useEffect(() => {
-    supabase.from("comunicazioni").select("*").order("created_at", { ascending: false }).limit(2)
-      .then(({ data }) => setMsgs(data || []));
+    supabase.from("comunicazioni").select("*").order("created_at", { ascending: false }).limit(8)
+      .then(({ data }) => setMsgs((data || []).filter(m => !m.eliminato).slice(0, 2)));
     storageUsageMB().then(setUsage);
   }, []);
 
