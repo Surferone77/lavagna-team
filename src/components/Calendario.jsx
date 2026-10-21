@@ -8,7 +8,7 @@ import { GREEN, CARD, LINE, MUTED, btnGhost, btnGreen } from "../lib/theme";
 
 const SHORT = { lun: "L", mar: "M", mer: "M", gio: "G", ven: "V", sab: "S", dom: "D" };
 
-export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, onToday, entries, name, onAdd, onRemove, onEdit, onUpload, onSetTimer, done = new Set(), onToggleDone }) {
+export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, onToday, entries, name, onAdd, onRemove, onEdit, onUpload, onSetTimer, done = new Set(), onToggleDone, records = [], onOpenAthlete }) {
   const [openForm, setOpenForm] = useState(null);
   const dates = weekDates(weekId);
   const today = todayISO();
@@ -17,6 +17,7 @@ export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, o
   const day = week?.days?.find(d => d.key === dayKey) || null;
   const date = dates[DAY_ORDER.indexOf(dayKey)];
   const prog = progress(day?.workouts, done);
+  const prIds = new Set(records.filter(r => r.scoreId).map(r => r.scoreId));
 
   return (
     <div>
@@ -75,7 +76,7 @@ export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, o
         </div>
       )}
       {day?.workouts.map(w => (
-        <WorkoutCard key={w.id} w={w} name={name} date={date} onSetTimer={onSetTimer} done={done.has(w.id)} onToggleDone={onToggleDone && (() => onToggleDone(w))} entries={entries.filter(e => e.wod === w.id)}
+        <WorkoutCard key={w.id} w={w} name={name} date={date} onSetTimer={onSetTimer} prIds={prIds} onOpenAthlete={onOpenAthlete} done={done.has(w.id)} onToggleDone={onToggleDone && (() => onToggleDone(w))} entries={entries.filter(e => e.wod === w.id)}
           open={openForm === w.id} setOpen={o => setOpenForm(o ? w.id : null)} onAdd={async (...a) => { const e = await onAdd(...a); if (!e) setOpenForm(null); return e; }} onRemove={onRemove} />
       ))}
       {day && day.workouts.length === 0 && <div style={{ color: MUTED, padding: 16 }}>Giorno di riposo.</div>}

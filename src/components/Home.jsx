@@ -8,13 +8,15 @@ import { GREEN, CARD, LINE, MUTED, btnGreen, h1 } from "../lib/theme";
 import { AppIcon, Wordmark } from "./Logo";
 import { Ring, DoneCheck } from "./Progress";
 import { progress } from "../lib/progress";
+import { prEvents, recTitle } from "../lib/records";
+import { showVal, prBadge } from "./Profilo";
 
 const initials = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join("");
 
 const box = { background: CARD, border: `1px solid ${LINE}`, borderRadius: 20, padding: 18, marginBottom: 14 };
 const h = { color: MUTED, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 6, marginBottom: 10 };
 
-export default function Home({ name, week, entries, done: doneSet = new Set(), onToggleDone, onOpenDay, onUpload, onBacheca, onRename }) {
+export default function Home({ name, week, entries, done: doneSet = new Set(), onToggleDone, records = [], onOpenAthlete, onOpenDay, onUpload, onBacheca, onRename }) {
   const [msgs, setMsgs] = useState([]);
   const [usage, setUsage] = useState(null);
   const today = todayISO();
@@ -32,6 +34,11 @@ export default function Home({ name, week, entries, done: doneSet = new Set(), o
   const mine = entries.filter(e => e.name === name);
   const wk = progress(all, doneSet);
   const td = progress(todayDay?.workouts, doneSet);
+  const events = prEvents(records.filter(r => !r.private));
+  const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  const teamPR = events.filter(e => e.date >= since).slice(0, 5);
+  const myCount = new Set(records.filter(r => r.athlete === name).map(r => `${r.exercise}|${r.rm}`)).size;
+  const ago = (iso) => { const d = Math.round((Date.parse(today) - Date.parse(iso)) / 864e5); return d <= 0 ? "oggi" : d === 1 ? "ieri" : `${d} g fa`; };
   const recent = mine.map(e => ({ e, w: all.find(w => w.id === e.wod) })).filter(x => x.w).sort((a, b) => b.e.ts - a.e.ts).slice(0, 4);
 
   return (
@@ -90,6 +97,23 @@ export default function Home({ name, week, entries, done: doneSet = new Set(), o
           ))}
         </div>}
       </div>}
+
+      <div style={box}>
+        <div style={h}><Trophy size={13} color={GREEN} /> Record del team</div>
+        {teamPR.length === 0 && <div style={{ color: MUTED, fontSize: 14 }}>Nessun nuovo record nell'ultimo mese.</div>}
+        {teamPR.map(e => (
+          <button key={e.id} onClick={() => onOpenAthlete?.(e.athlete)} style={{ display: "flex", width: "100%", alignItems: "center", gap: 8, background: "none", border: "none", padding: "6px 0", cursor: "pointer", textAlign: "left" }}>
+            <span style={prBadge}>PR</span>
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 14 }}>
+              <b style={{ color: e.athlete === name ? GREEN : "#fff" }}>{e.athlete === name ? "Tu" : e.athlete}</b> <span style={{ color: "#ccc" }}>· {recTitle(e)}</span>
+            </span>
+            <span style={{ color: "#fff", fontWeight: 800, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{showVal(e)}</span>
+            <span style={{ color: MUTED, fontSize: 11.5, width: 44, textAlign: "right" }}>{ago(e.date)}</span>
+          </button>
+        ))}
+        <button onClick={() => onOpenAthlete?.(name)} style={{ background: "none", border: "none", color: GREEN, fontSize: 13, fontWeight: 600, padding: "8px 0 0", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+          Il mio profilo{myCount ? ` · ${myCount} record` : ""} <ChevronRight size={14} /></button>
+      </div>
 
       <div style={box}>
         <div style={h}><MessageSquare size={13} color={GREEN} /> Bacheca</div>

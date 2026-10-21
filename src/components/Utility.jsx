@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Percent, ArrowLeftRight, Timer as TimerIcon, ChevronLeft } from "lucide-react";
 import { TimerSetup, TimerScreen } from "./Timer";
 import { GREEN, CARD, LINE, MUTED, inp, pill, pillOn, h1 } from "../lib/theme";
+import { groupRecords, est1RM } from "../lib/records";
 
 const LB = 0.45359237;
 const PERCENTS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
@@ -21,7 +22,7 @@ const TOOLS = [
   { key: "conv", title: "Libbre ⇄ chili", sub: "Conversione e pesi comuni", Icon: ArrowLeftRight },
 ];
 
-export default function Utility() {
+export default function Utility({ name = "", records = [] }) {
   const [tool, setTool] = useState(null);
   const [running, setRunning] = useState(null);
   const t = TOOLS.find(x => x.key === tool);
@@ -32,7 +33,7 @@ export default function Utility() {
         <div style={{ ...h1, fontSize: 24 }}>{t.title}</div>
       </div>
       {tool === "timer" && <div style={box}><TimerSetup onStart={setRunning} /></div>}
-      {tool === "perc" && <Percentuali />}
+      {tool === "perc" && <Percentuali maxes={myMaxes(records, name)} />}
       {tool === "conv" && <Conversione />}
       {running && <TimerScreen config={running} onClose={() => setRunning(null)} />}
     </div>
@@ -57,16 +58,39 @@ export default function Utility() {
   );
 }
 
-function Percentuali() {
+// Massimali dai miei record: 1RM reale se c'è, altrimenti stimato da 2–10RM
+function myMaxes(records, name) {
+  const by = {};
+  for (const g of groupRecords(records.filter(r => r.athlete === name && r.kind === "weight"))) {
+    const kg = est1RM(g.best.value, g.rm || 1), cur = by[g.exercise];
+    if (!cur || (g.rm === 1 && cur.est) || (!!cur.est === (g.rm !== 1) && kg > cur.kg)) by[g.exercise] = { exercise: g.exercise, kg: Math.round(kg * 2) / 2, est: g.rm !== 1 };
+  }
+  return Object.values(by).sort((a, b) => a.exercise.localeCompare(b.exercise));
+}
+
+function Percentuali({ maxes = [] }) {
   const [w, setW] = useState("");
   const [unit, setUnit] = useState("kg");
   const [step, setStep] = useState(0.5);
+  const [pick, setPick] = useState(null);
   const base = num(w);
   return (
     <div style={box}>
       <div style={head}><Percent size={18} color={GREEN} /> Percentuali del massimale</div>
+      {maxes.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ color: MUTED, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Usa il mio 1RM</div>
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 }}>
+            {maxes.map(m => (
+              <button key={m.exercise} onClick={() => { setPick(m.exercise); setUnit("kg"); setW(String(m.kg)); }} style={{ ...pill, flexShrink: 0, padding: "6px 10px", ...(pick === m.exercise ? pillOn : {}) }}>
+                {m.exercise} · {m.est ? "≈" : ""}{fmt(m.kg)} kg
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <input value={w} onChange={e => setW(e.target.value)} inputMode="decimal" placeholder="Il tuo 1RM, es. 100"
+        <input value={w} onChange={e => { setW(e.target.value); setPick(null); }} inputMode="decimal" placeholder="Il tuo 1RM, es. 100"
           aria-label="Peso" style={{ ...inp, flex: 1, minWidth: 0, fontSize: 20, fontWeight: 800 }} />
         {["kg", "lb"].map(u => <button key={u} onClick={() => setUnit(u)} style={{ ...pill, padding: "9px 14px", ...(unit === u ? pillOn : {}) }}>{u}</button>)}
       </div>

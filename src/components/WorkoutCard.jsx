@@ -4,6 +4,7 @@ import { suggestTimer, sanitizeTimer } from "../lib/timer";
 import { Plus, Trophy, X, Check, Trash2, ChevronDown, ChevronUp, NotebookPen , Timer as TimerIcon } from "lucide-react";
 import PhotoStrip from "./PhotoStrip";
 import NotesSection from "./NotesSection";
+import { prBadge } from "./Profilo";
 import { TYPE_META, toValue, display, formatHint, buildBoard } from "../lib/scoring";
 import { GREEN, CARD, LINE, MUTED, RED, inp, btnGreen, btnGhost, btnTextMuted, pill, pillOn } from "../lib/theme";
 
@@ -12,7 +13,7 @@ function Badge({ Icon, note }) {
     {note ? <NotebookPen size={19} color="#9a9a9a" /> : <Icon size={20} color={GREEN} strokeWidth={2.4} />}</div>;
 }
 
-export default function WorkoutCard({ w, name, date, entries, open, setOpen, onAdd, onRemove, onSetTimer, done = false, onToggleDone }) {
+export default function WorkoutCard({ w, name, date, entries, open, setOpen, onAdd, onRemove, onSetTimer, done = false, onToggleDone, prIds = new Set(), onOpenAthlete }) {
   const [showHist, setShowHist] = useState(false);
   const [timer, setTimer] = useState(null);     // configurazione del timer in corso
   const [sheet, setSheet] = useState(false);    // scelta del timer aperta
@@ -68,11 +69,12 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
                 background: mine ? "rgba(184,255,44,0.10)" : "#1f1f1f", border: mine ? `1px solid ${GREEN}` : "1px solid transparent" }}>
                 <div style={{ width: 24, textAlign: "center", fontSize: medal ? 16 : 13, color: MUTED, fontWeight: 700 }}>{medal || i + 1}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: "#fff", fontSize: 14.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <button onClick={() => onOpenAthlete?.(e.name)} aria-label={`Profilo di ${e.name}`} style={{ display: "block", maxWidth: "100%", background: "none", border: "none", padding: 0, cursor: onOpenAthlete ? "pointer" : "default", textAlign: "left", color: "#fff", fontSize: 14.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {e.name}{mine && <span style={{ color: GREEN, fontSize: 11, marginLeft: 6 }}>tu</span>}
-                  </div>
+                  </button>
                   {e.note && <div style={{ color: MUTED, fontSize: 12 }}>{e.note}</div>}
                 </div>
+                {prIds.has(e._key) && <span style={prBadge}>PR</span>}
                 <span style={{ color: e.rx ? GREEN : MUTED, fontSize: 10, fontWeight: 800, border: `1px solid ${e.rx ? GREEN : "#444"}`, borderRadius: 6, padding: "1px 5px" }}>{e.rx ? "RX" : "SC"}</span>
                 <div style={{ color: "#fff", fontSize: 15, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{display(w.type, e.value, e.raw)}</div>
                 {mine && <button onClick={() => onRemove(e)} aria-label="Rimuovi" style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "inline-flex", color: "#777" }}><Trash2 size={14} /></button>}

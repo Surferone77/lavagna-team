@@ -13,6 +13,9 @@ import WorkoutEditor from "./components/WorkoutEditor";
 import UploadPanel from "./components/UploadPanel";
 import Bacheca from "./components/Bacheca";
 import Utility from "./components/Utility";
+import Profilo from "./components/Profilo";
+import { rowToRecord, matchScore, wouldBePR, recKey, recTitle } from "./lib/records";
+import { CAP_BASE, display as showScore } from "./lib/scoring";
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -67,6 +70,10 @@ function Main() {
   const [weeks, setWeeks] = useState({});           // cache: id -> settimana | null
   const [entries, setEntries] = useState([]);
   const [done, setDone] = useState(() => new Set());   // blocchi completati (solo miei)
+  const [records, setRecords] = useState([]);          // record personali visibili (pubblici + i miei privati)
+  const [profile, setProfile] = useState(null);        // nome dell'atleta di cui vedo il profilo
+  const [toast, setToast] = useState(null);
+  const nameRef = useRef(name); nameRef.current = name;
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState(null);
   const [tab, setTab] = useState("home");           // home | calendario | carica | bacheca
@@ -88,6 +95,33 @@ function Main() {
   const loadScores = async () => {
     const { data, error } = await supabase.from("scores").select("*");
     if (!error) setEntries((data || []).map(rowToEntry));
+  };
+
+  // Record personali: i privati degli altri non arrivano mai nell'interfaccia
+  const loadRecords = async () => {
+    const { data, error } = await supabase.from("personal_records").select("*");
+    if (!error) setRecords((data || []).map(rowToRecord).filter(r => !r.private || r.athlete === nameRef.current));
+  };
+  useEffect(() => { loadRecords(); }, [name]);
+  const openProfile = (n) => { setProfile(n); window.scrollTo(0, 0); };
+  const flash = (t) => { setToast(t); setTimeout(() => setToast(x => x === t ? null : x), 3500); };
+  const addRecord = async (rec, scoreId = null) => {
+    const isPR = wouldBePR(records, name, rec);
+    const row = { athlete: name, category: rec.category, exercise: rec.exercise, kind: rec.kind, rm: rec.rm, value: rec.value, raw: rec.raw, record_date: rec.date || todayISO(), note: rec.note || "", private: !!rec.private, score_id: scoreId };
+    const { data, error } = await supabase.from("personal_records").insert(row).select().single();
+    if (error) return { error: "Record non salvato: " + error.message };
+    setRecords(p => p.some(x => x.id === data.id) ? p : [...p, rowToRecord(data)]);
+    if (isPR) flash(`🏆 Nuovo PR! ${recTitle(rec)} · ${showScore(rec.kind, rec.value, rec.raw)}`);
+    return { pr: isPR };
+  };
+  const removeRecord = async (r) => {
+    const { error } = await supabase.from("personal_records").delete().eq("id", r.id);
+    if (!error) setRecords(p => p.filter(x => x.id !== r.id));
+  };
+  const setRecordPrivate = async (g, priv) => {
+    const ids = records.filter(r => r.athlete === name && recKey(r) === g.key).map(r => r.id);
+    setRecords(p => p.map(r => ids.includes(r.id) ? { ...r, private: priv } : r));
+    await supabase.from("personal_records").update({ private: priv }).in("id", ids);
   };
 
   // Blocchi segnati come completati: privati, filtrati per nome atleta
@@ -116,6 +150,7 @@ function Main() {
       setLoading(false);
       ch = supabase.channel("live")
         .on("postgres_changes", { event: "*", schema: "public", table: "scores" }, loadScores)
+        .on("postgres_changes", { event: "*", schema: "public", table: "personal_records" }, loadRecords)
         .on("postgres_changes", { event: "*", schema: "public", table: "weeks" }, (p) => {
           if (p.new?.id && p.new.id in weeksRef.current) putWeek(p.new.id, ingest(p.new.data));
         })
@@ -166,11 +201,22 @@ function Main() {
     if (error) return "Punteggio non salvato: " + error.message;
     setEntries(p => p.some(x => x._key === data.id) ? p : [...p, rowToEntry(data)]);
     setBlockDone(wo, true);   // registrare il punteggio = blocco completato
+    // Se il blocco è un massimale o un benchmark e il punteggio batte il mio record, diventa un PR
+    const m = matchScore(wo);
+    if (m && value !== null && !(wo.type === "time" && value > CAP_BASE / 2)) {
+      const cand = { ...m, value, raw: raw.trim() };
+      if (wouldBePR(records, name, cand)) {
+        const priv = records.some(r => r.athlete === name && recKey(r) === recKey(cand) && r.private);
+        addRecord({ ...cand, date: todayISO(), note: wo.title, private: priv }, data.id);
+      }
+    }
     return null;
   };
   const removeEntry = async (e) => {
     const { error } = await supabase.from("scores").delete().eq("id", e._key);
     if (!error) setEntries(p => p.filter(x => x._key !== e._key));
+    const linked = records.filter(r => r.scoreId === e._key);
+    if (linked.length) { await supabase.from("personal_records").delete().eq("score_id", e._key); setRecords(p => p.filter(r => r.scoreId !== e._key)); }
   };
   const rename = () => { const n = prompt("Il tuo nome", name); if (n?.trim()) { setName(n.trim()); store.set("athlete:name", n.trim()); } };
 
@@ -189,19 +235,24 @@ function Main() {
   else if (tab === "carica") body = <UploadPanel key={uploadDate || "oggi"} initialDate={uploadDate} currentWeek={weeks[weekInfo(uploadDate || todayISO()).weekId]}
     onAdd={saveDay} onCancel={() => setTab("home")} onImportJson={() => setSub("import")} />;
   else if (tab === "bacheca") body = <Bacheca name={name} />;
-  else if (tab === "utility") body = <Utility />;
+  else if (profile && tab !== "carica") body = <Profilo athlete={profile} me={name} records={records} onBack={() => setProfile(null)}
+    onAdd={addRecord} onRemove={removeRecord} onSetPrivate={setRecordPrivate} onRename={rename} />;
+  else if (tab === "utility") body = <Utility name={name} records={records} />;
   else if (tab === "calendario") body = <Calendario weekId={calWeek} week={calWeekData} dayKey={calDay} setDayKey={setCalDay}
     onShift={(d) => openWeek(shiftWeek(calWeek, d))} onToday={() => openWeek(thisWeek)}
     entries={entries} name={name} onAdd={addScore} onRemove={removeEntry} onEdit={() => setSub("edit")}
-    onUpload={(date) => { setUploadDate(date); setTab("carica"); }} onSetTimer={setBlockTimer} done={done} onToggleDone={toggleDone} />;
-  else body = <Home name={name} week={weeks[thisWeek]} entries={entries} done={done} onToggleDone={toggleDone} onOpenDay={goDay} onRename={rename}
+    onUpload={(date) => { setUploadDate(date); setTab("carica"); }} onSetTimer={setBlockTimer} done={done} onToggleDone={toggleDone}
+    records={records} onOpenAthlete={openProfile} />;
+  else body = <Home name={name} week={weeks[thisWeek]} entries={entries} done={done} onToggleDone={toggleDone} onOpenDay={goDay} onRename={() => openProfile(name)}
+    records={records} onOpenAthlete={openProfile}
     onUpload={() => { setUploadDate(null); setTab("carica"); }} onBacheca={() => setTab("bacheca")} />;
 
-  const go = (k) => { setSub(null); if (k === "carica") setUploadDate(null); if (k === "calendario" && tab !== "calendario") openWeek(thisWeek); setTab(k); };
+  const go = (k) => { setSub(null); setProfile(null); if (k === "carica") setUploadDate(null); if (k === "calendario" && tab !== "calendario") openWeek(thisWeek); setTab(k); };
   return (
     <Shell>
       {loadErr && <div style={{ color: RED, fontSize: 13, marginTop: 12 }}>{loadErr}</div>}
       {body}
+      {toast && <div role="status" className="fade" style={{ position: "fixed", left: 16, right: 16, bottom: "calc(80px + env(safe-area-inset-bottom))", zIndex: 30, maxWidth: 520, margin: "0 auto", background: GREEN, color: "#0b0b0b", fontWeight: 900, fontSize: 15, borderRadius: 16, padding: "13px 16px", textAlign: "center", boxShadow: "0 10px 30px rgba(0,0,0,.5)" }} onClick={() => setToast(null)}>{toast}</div>}
       <div style={{ height: "calc(90px + env(safe-area-inset-bottom))" }} />
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "rgba(14,14,14,0.92)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderTop: `1px solid ${LINE}`, paddingBottom: "env(safe-area-inset-bottom)", zIndex: 10 }}>
         <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", height: 64, padding: "0 8px" }}>

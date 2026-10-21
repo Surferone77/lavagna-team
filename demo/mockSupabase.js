@@ -47,6 +47,14 @@ const db = {
     sc(mon[1].id, "Marco", 120, "120"), sc(mon[1].id, "Luca", 110, "110"), sc(mon[1].id, "Giulia", 85, "85"),
   ],
   workout_done: [mon[0].id, mon[1].id, `${PW}__mar__0`].map((w, i) => ({ id: `d${i}`, athlete: "Chicco", workout_id: w, week_id: w.split("__")[0] })),
+  personal_records: [
+    ["Chicco", "lift", "Back Squat", "weight", 1, 120, "120", "2026-03-10", false], ["Chicco", "lift", "Back Squat", "weight", 1, 125, "125", "2026-06-02", false],
+    ["Chicco", "lift", "Back Squat", "weight", 1, 130, "130", "2026-09-15", false], ["Chicco", "lift", "Deadlift", "weight", 1, 170, "170", "2026-08-20", false],
+    ["Chicco", "bench", "Fran", "time", null, 312, "5:12", "2026-05-04", false], ["Chicco", "bench", "Fran", "time", null, 289, "4:49", "2026-09-30", false],
+    ["Chicco", "hyrox", "HYROX gara completa", "time", null, 5130, "1:25:30", "2026-04-12", true], ["Chicco", "lift", "Clean & Jerk", "weight", 1, 92.5, "92.5", "2026-07-01", false],
+    ["Marco", "lift", "Back Squat", "weight", 1, 140, "140", "2026-10-18", false], ["Giulia", "engine", "Corsa 5 km", "time", null, 1395, "23:15", "2026-10-15", false],
+    ["Giulia", "lift", "Snatch", "weight", 1, 55, "55", "2026-10-08", false], ["Luca", "bench", "Murph", "time", null, 2950, "49:10", "2026-09-28", true],
+  ].map(([athlete, category, exercise, kind, rm, value, raw, record_date, priv], i) => ({ id: `pr${i}`, athlete, category, exercise, kind, rm, value, raw, record_date, note: "", private: priv, score_id: null, created_at: new Date(Date.now() - (20 - i) * 3600e3).toISOString() })),
   comunicazioni: [
     { id: "c1", utente: "Giulia", messaggio: "Domani alle 18:30 chi c'è? Porto i sacchi per il sled 💪", created_at: new Date(Date.now() - 5 * 3600e3).toISOString() },
     { id: "c2", utente: "Marco", messaggio: "Presente. Metcon di oggi brutale.", created_at: new Date(Date.now() - 2 * 3600e3).toISOString() },
@@ -73,7 +81,8 @@ function query(table) {
       notify(table, r);
       return { data: null, error: null };
     }
-    let out = rows.filter(r => st.filters.every(([k, v]) => r[k] === v));
+    let out = rows.filter(r => st.filters.every(f => f(r)));
+    if (st.op === "update") { out.forEach(r => { Object.assign(r, clone(st.payload)); notify(table, r); }); return { data: null, error: null }; }
     if (st.op === "delete") { db[table] = rows.filter(r => !out.includes(r)); return { data: null, error: null }; }
     if (st.order) out = [...out].sort((a, b) => (a[st.order.col] > b[st.order.col] ? 1 : -1) * (st.order.asc ? 1 : -1));
     if (st.limit) out = out.slice(0, st.limit);
@@ -86,7 +95,9 @@ function query(table) {
     insert(p) { st.op = "insert"; st.payload = p; return b; },
     upsert(p) { st.op = "upsert"; st.payload = p; return b; },
     delete() { st.op = "delete"; return b; },
-    eq(k, v) { st.filters.push([k, v]); return b; },
+    eq(k, v) { st.filters.push(r => r[k] === v); return b; },
+    in(k, vs) { st.filters.push(r => vs.includes(r[k])); return b; },
+    update(p) { st.op = "update"; st.payload = p; return b; },
     order(col, o = {}) { st.order = { col, asc: o.ascending !== false }; return b; },
     limit(x) { st.limit = x; return b; },
     single() { st.single = true; return b; },
