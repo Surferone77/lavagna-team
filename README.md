@@ -1,83 +1,86 @@
-# Lavagna Team HYROX
+# The Hybrid One — app del team
 
-Lavagna allenamenti per il team: divisa per giorni e workout, classifica live condivisa,
-e lettura automatica degli screenshot con l'AI. Frontend React (Vite) + Supabase.
+Lavagna allenamenti per il team, stile SugarWOD: workout del giorno divisi in blocchi,
+classifica live (RX / Scaled), storico, bacheca del team. Gli allenamenti si caricano
+da screenshot o foto: l'AI li legge, tu controlli le card e salvi.
 
-Database **vuoto**: lo riempi tu caricando gli screenshot dalla app.
+Frontend React (Vite) · Database e realtime Supabase · Lettura AI con una Edge Function · Hosting Netlify.
 
 ---
 
-## Cosa ti serve (gratis)
-- Account **Supabase** → https://supabase.com
-- Account **Vercel** → https://vercel.com
-- Una **chiave API Anthropic** (per la lettura screenshot) → https://console.anthropic.com
-- **Node.js** installato in locale, e la **Supabase CLI** (`npm i -g supabase`)
+## Novità v2
+- **Upload foto affidabile**: ogni immagine viene convertita in JPEG e ridimensionata nel browser
+  (HEIC dell'iPhone compreso). Gli screenshot lunghi vengono tagliati in pezzi sovrapposti,
+  così il testo resta leggibile. Una chiamata AI per screenshot, con "Riprova" sul singolo file.
+- **Risposta AI strutturata** (tool use): niente più JSON troncati o "errore parse".
+- **Revisione a card**: titolo, formato, tipo di punteggio e testo modificabili, riordino, aggiunta ed eliminazione.
+- **Punteggi**: For Time (anche `CAP+12`), Reps, Round+reps (`5+12`), Carico, Nota. Classifica RX sopra Scaled, con filtro.
+- **Id stabili**: se ricarichi o modifichi un giorno, i punteggi restano sui blocchi con lo stesso titolo.
+- **Data automatica**: scegli il giorno, settimana ed etichetta si calcolano da sole.
+- **Bacheca** del team in tempo reale.
 
 ---
 
 ## 1) Database (Supabase)
-1. Crea un nuovo progetto su Supabase.
-2. Apri **SQL Editor** → incolla tutto il contenuto di `schema.sql` → **Run**.
-   Crea le tabelle `weeks` e `scores`, le policy, il realtime e il bucket `screenshots`.
-3. In **Project Settings → API** copia: `Project URL` e la chiave `anon public`.
-   Ti servono al passo 3.
+SQL Editor → esegui in ordine:
+1. `schema.sql` (solo su un progetto nuovo)
+2. `supabase/migrations/002_v2_upgrade.sql` (su tutti: si può ripetere senza danni)
 
-## 2) Edge Function (lettura screenshot con l'AI)
-La chiave Anthropic resta sul server, non finisce mai nel browser.
+Da **Project Settings → API** copia `Project URL` e la chiave `anon public`.
 
+## 2) Edge Function (lettura AI)
 ```bash
-# dalla cartella del progetto
 supabase login
-supabase link --project-ref IL-TUO-PROJECT-REF      # lo trovi nell'URL del progetto
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...    # la tua chiave Anthropic
+supabase link --project-ref IL-TUO-PROJECT-REF
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+# facoltativo: cambiare modello senza toccare il codice
+# supabase secrets set ANTHROPIC_MODEL=claude-sonnet-4-6
 supabase functions deploy read-screenshots
 ```
 
-## 3) Frontend in locale (prova)
+## 3) In locale
 ```bash
 npm install
-cp .env.example .env
-# apri .env e incolla VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (dal passo 1)
+cp .env.example .env     # incolla VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY
 npm run dev
 ```
-Apri l'indirizzo locale: dovresti vedere la lavagna vuota. Prova **Carica screenshot**.
 
-## 4) Online (Vercel)
-1. Metti il progetto su GitHub (`git init`, commit, push).
-2. Su Vercel: **New Project** → importa la repo.
-3. In **Environment Variables** aggiungi `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
-4. **Deploy**. Ottieni un URL tipo `https://lavagna-team.vercel.app`.
-5. Mandi quel link nel gruppo WhatsApp: il team lo apre e logga i punteggi.
+## 4) Online (Netlify)
+1. Push della repo su GitHub.
+2. Netlify → **Add new site → Import an existing project** → scegli la repo.
+   Build e cartella di pubblicazione sono già in `netlify.toml` (`npm run build` → `dist`).
+3. **Site configuration → Environment variables**: aggiungi `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+4. **Deploy**. Ogni `git push` rifà il deploy da solo.
 
-> Dominio tuo (opzionale): in Vercel → Settings → Domains puoi collegare
-> es. `lavagna.enrico-smeraldi.com`.
+Sul telefono: apri il link in Safari → Condividi → **Aggiungi a Home** e si usa come un'app.
 
 ---
 
-## Uso settimanale
-- **Carica screenshot** → scegli giorno + immagini → l'AI legge → controlli → **Aggiungi alla lavagna**.
-- Il team apre il link, mette il nome (una volta), e inserisce i punteggi.
-- Le classifiche si aggiornano **in tempo reale** per tutti.
+## Link per la coach (Giada)
+Pagina semplificata per caricare il programma di tutta la settimana: un pulsante, selezione degli
+screenshot, giorni riconosciuti in automatico (quelli non scritti vanno in ordine e sono evidenziati
+in giallo), **Pubblica**, poi "Avvisa il gruppo su WhatsApp".
 
-## Fare modifiche
-- **Contenuti** (workout, settimane): dalla app, oppure a mano nel Table Editor di Supabase.
-- **Aspetto / nuove funzioni**: modifichi il codice React → `git push` → Vercel ri-deploya da solo.
-- **Database** (nuove colonne/tabelle): piccoli script SQL nel SQL Editor.
+1. Scegli un codice lungo e mettilo in `VITE_COACH_CODE` (in `.env` e nelle variabili di Netlify).
+2. Manda a Giada il link `https://tuo-sito.netlify.app/?coach=IL-CODICE`.
+3. Lei lo apre in Safari → Condividi → **Aggiungi a Home**.
 
-## Sicurezza (da sapere)
-Di default l'accesso è **anonimo e permissivo**: chiunque abbia il link + anon key può
-leggere e scrivere. Va bene per un team ristretto. Per restringere:
-- aggiungi **Supabase Auth** (login) e cambia le policy RLS in `schema.sql` per legare
-  scrittura a utenti autenticati;
-- oppure tieni l'editing settimane solo a te e lascia al team solo l'inserimento punteggi.
-Chiedi pure e ti preparo la versione con login.
+Dal sabato in poi la pagina propone già la settimana successiva.
+
+## Sicurezza
+L'accesso è anonimo: chiunque abbia il link può leggere e scrivere. Per un team ristretto va bene.
+Il codice coach nasconde la pagina di caricamento, ma non è una vera protezione del database: per quella serve il login.
+Prossimo passo consigliato: login Supabase Auth e caricamento allenamenti riservato ai coach.
 
 ## Struttura
 ```
-schema.sql                              -> da eseguire su Supabase
-supabase/functions/read-screenshots/    -> Edge Function (lettura AI)
-src/App.jsx                             -> la app
-src/supabaseClient.js                   -> connessione Supabase
-.env.example                           -> variabili da compilare
+schema.sql                                -> schema base
+supabase/migrations/002_v2_upgrade.sql    -> bacheca, realtime, indici
+supabase/functions/read-screenshots/      -> Edge Function AI
+src/App.jsx                               -> navigazione, lavagna, salvataggi
+src/components/                           -> WorkoutCard, UploadPanel, WorkoutEditor, Bacheca
+src/lib/images.js                         -> conversione, resize e taglio immagini
+src/lib/scoring.js                        -> tipi di punteggio e classifica
+src/lib/weeks.js                          -> settimane ISO, id stabili, unione risultati
+netlify.toml                              -> configurazione Netlify
 ```
-# lavagna-team
