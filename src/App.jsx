@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Home as HomeIcon, CalendarDays, Camera, MessageSquare, Upload, X, Check } from "lucide-react";
+import { Home as HomeIcon, CalendarDays, Camera, MessageSquare, Upload, X, Check, ChevronRight } from "lucide-react";
 import { supabase, supabaseConfigured } from "./supabaseClient";
 import { GREEN, BG, CARD, LINE, MUTED, RED, FONT, inp, btnGreen, btnGhost } from "./lib/theme";
 import { AppIcon, ShieldMark, Wordmark } from "./components/Logo";
@@ -16,6 +16,10 @@ import Bacheca from "./components/Bacheca";
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* navigazione privata */ } },
+};
+const session = {
+  get: (k) => { try { return sessionStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { sessionStorage.setItem(k, v); } catch { /* navigazione privata */ } },
 };
 const rowToEntry = (r) => ({ _key: r.id, wod: r.workout_id, name: r.athlete, value: r.value, raw: r.raw, note: r.note, rx: r.rx, ts: new Date(r.created_at).getTime() });
 
@@ -58,6 +62,7 @@ function defaultDay(weekId, week) {
 function Main() {
   const thisWeek = weekInfo(todayISO()).weekId;
   const [name, setName] = useState(store.get("athlete:name") || "");
+  const [entered, setEntered] = useState(session.get("entered") === "1");
   const [weeks, setWeeks] = useState({});           // cache: id -> settimana | null
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -139,7 +144,11 @@ function Main() {
   const rename = () => { const n = prompt("Il tuo nome", name); if (n?.trim()) { setName(n.trim()); store.set("athlete:name", n.trim()); } };
 
   if (loading) return <Shell><div style={{ minHeight: "80vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}><AppIcon size={84} style={{ animation: "fade .5s ease both" }} /><Wordmark size={20} /></div></Shell>;
-  if (!name) return <Shell><NameGate onSave={(n) => { setName(n); store.set("athlete:name", n); }} /></Shell>;
+  if (!name || !entered) return <Shell><Splash name={name} onEnter={(n, target) => {
+    if (n !== name) { setName(n); store.set("athlete:name", n); }
+    setEntered(true); session.set("entered", "1");
+    if (target === "carica") { setUploadDate(null); setTab("carica"); }
+  }} /></Shell>;
 
   const calWeekData = weeks[calWeek];
   const calDayData = calWeekData?.days?.find(d => d.key === calDay);
@@ -187,22 +196,33 @@ function Shell({ children }) {
   );
 }
 
-function NameGate({ onSave }) {
+// Schermata di apertura: logo grande, "Entra" e accesso rapido al caricamento.
+// La prima volta chiede anche il nome.
+function Splash({ name, onEnter }) {
   const [v, setV] = useState("");
-  const go = () => v.trim() && onSave(v.trim());
+  const needName = !name;
+  const go = (target) => { const n = needName ? v.trim() : name; if (!n) return; onEnter(n, target); };
   return (
-    <div className="fade" style={{ minHeight: "88vh", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      <div style={{ position: "relative", display: "flex", justifyContent: "center", marginBottom: 22 }}>
-        <div style={{ position: "absolute", width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(184,255,44,0.22) 0%, rgba(184,255,44,0) 70%)", top: -30 }} />
-        <ShieldMark size={150} style={{ position: "relative", filter: "drop-shadow(0 12px 30px rgba(0,0,0,.6))" }} />
+    <div className="fade" style={{ minHeight: "92vh", display: "flex", flexDirection: "column", justifyContent: "center", paddingBottom: 24 }}>
+      <div style={{ position: "relative", display: "flex", justifyContent: "center", marginBottom: 26 }}>
+        <div style={{ position: "absolute", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(184,255,44,0.25) 0%, rgba(184,255,44,0) 68%)", top: -50 }} />
+        <ShieldMark size={210} style={{ position: "relative", filter: "drop-shadow(0 16px 36px rgba(0,0,0,.65))" }} />
       </div>
-      <div style={{ textAlign: "center" }}><Wordmark size={32} stacked /></div>
-      <p style={{ color: MUTED, fontSize: 15, textAlign: "center", margin: "14px 0 28px", lineHeight: 1.45 }}>Il programma del team, i tuoi punteggi,<br />la classifica live.</p>
-      <div style={{ background: CARD, border: `1px solid ${LINE}`, borderRadius: 20, padding: 16 }}>
-        <label style={{ color: MUTED, fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase" }}>Come ti chiami?</label>
-        <input value={v} onChange={e => setV(e.target.value)} onKeyDown={e => e.key === "Enter" && go()} placeholder="Nome e cognome" style={{ ...inp, width: "100%", marginTop: 8 }} autoFocus />
-        <button onClick={go} style={{ ...btnGreen, width: "100%", justifyContent: "center", marginTop: 10, padding: 14, fontSize: 16 }}>Entra</button>
-      </div>
+      <div style={{ textAlign: "center" }}><Wordmark size={44} stacked /></div>
+      <p style={{ color: MUTED, fontSize: 15.5, textAlign: "center", margin: "16px 0 30px", lineHeight: 1.45 }}>Il programma del team, i tuoi punteggi,<br />la classifica live.</p>
+      {needName ? (
+        <div style={{ background: CARD, border: `1px solid ${LINE}`, borderRadius: 20, padding: 16 }}>
+          <label style={{ color: MUTED, fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase" }}>Come ti chiami?</label>
+          <input value={v} onChange={e => setV(e.target.value)} onKeyDown={e => e.key === "Enter" && go("home")} placeholder="Nome e cognome" style={{ ...inp, width: "100%", marginTop: 8 }} autoFocus />
+          <button onClick={() => go("home")} style={{ ...btnGreen, width: "100%", justifyContent: "center", marginTop: 10, padding: 15, fontSize: 17 }}>Entra</button>
+        </div>
+      ) : (
+        <div>
+          <button onClick={() => go("home")} style={{ ...btnGreen, width: "100%", justifyContent: "center", padding: 17, fontSize: 18, borderRadius: 16 }}>Entra <ChevronRight size={20} /></button>
+          <button onClick={() => go("carica")} style={{ ...btnGhost, width: "100%", justifyContent: "center", padding: 15, fontSize: 15.5, borderRadius: 16, marginTop: 10, color: "#fff" }}><Camera size={18} color={GREEN} /> Carica lo screenshot</button>
+          <div style={{ textAlign: "center", color: MUTED, fontSize: 13, marginTop: 16 }}>Ciao <b style={{ color: "#fff" }}>{name}</b></div>
+        </div>
+      )}
     </div>
   );
 }
