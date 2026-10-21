@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Plus, Trophy, X, Check, Trash2, ChevronDown, ChevronUp, NotebookPen } from "lucide-react";
+import { TimerScreen } from "./Timer";
+import { configFromWorkout, DEFAULTS as TIMER_DEFAULTS } from "../lib/timer";
+import { Plus, Trophy, X, Check, Trash2, ChevronDown, ChevronUp, NotebookPen , Timer as TimerIcon } from "lucide-react";
 import PhotoStrip from "./PhotoStrip";
 import NotesSection from "./NotesSection";
 import { TYPE_META, toValue, display, formatHint, buildBoard } from "../lib/scoring";
@@ -12,6 +14,13 @@ function Badge({ Icon, note }) {
 
 export default function WorkoutCard({ w, name, date, entries, open, setOpen, onAdd, onRemove }) {
   const [showHist, setShowHist] = useState(false);
+  const [timer, setTimer] = useState(null);     // configurazione del timer aperto
+  const [prefill, setPrefill] = useState(null); // tempo arrivato dal timer
+  const timerCfg = useMemo(() => configFromWorkout(w), [w]);
+  const openTimer = () => {
+    let saved = {}; try { saved = JSON.parse(localStorage.getItem("timer:cfg")) || {}; } catch { /* */ }
+    setTimer({ ...TIMER_DEFAULTS, prep: saved.prep ?? 10, sound: saved.sound ?? true, ...timerCfg });
+  };
   const [division, setDivision] = useState("all");
   const isNote = w.type === "note";
   const meta = TYPE_META[w.type] || TYPE_META.time;
@@ -25,6 +34,7 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Badge Icon={Icon} note={isNote} />
           <div style={{ flex: 1, minWidth: 0 }}>
+            {timerCfg && <button onClick={openTimer} aria-label="Apri timer per questo blocco" style={{ float: "right", marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(184,255,44,0.12)", color: GREEN, border: "1px solid rgba(184,255,44,0.3)", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}><TimerIcon size={14} /> Timer</button>}
             <div style={{ color: "#fff", fontSize: 17.5, fontWeight: 800, lineHeight: 1.2, letterSpacing: -0.2 }}>{w.title}</div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, background: "#222", color: isNote ? MUTED : GREEN, fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 999 }}>
               {isNote ? (w.tag || "Nota · senza punteggio") : <><Icon size={12} /> {w.tag && w.tag.toLowerCase().includes(meta.label.toLowerCase()) ? w.tag : [w.tag, meta.label].filter(Boolean).join(" · ")}</>}
@@ -68,7 +78,7 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
             );
           })}
           {open
-            ? <ScoreForm w={w} onAdd={onAdd} onCancel={() => setOpen(false)} />
+            ? <ScoreForm key={prefill ? JSON.stringify(prefill) : "new"} w={w} initial={prefill} onAdd={onAdd} onCancel={() => { setOpen(false); setPrefill(null); }} />
             : <button onClick={() => setOpen(true)} style={{ ...btnGreen, width: "100%", marginTop: 4, justifyContent: "center" }}><Plus size={16} /> Aggiungi il tuo punteggio</button>}
           {entries.length > 0 && <button onClick={() => setShowHist(s => !s)} style={{ ...btnTextMuted, marginTop: 10 }}>{showHist ? <ChevronUp size={14} /> : <ChevronDown size={14} />} Storico ({entries.length})</button>}
           {showHist && <div style={{ marginTop: 8 }}>{[...entries].sort((a, b) => b.ts - a.ts).map(e => (
@@ -77,16 +87,22 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
             </div>))}</div>}
         </div>
       </>}
+      {timer && <TimerScreen config={timer} title={w.title} onClose={() => setTimer(null)}
+        onResult={isNote ? undefined : (sec, isCap) => {
+          setTimer(null);
+          setPrefill(isCap ? { cap: true } : { mm: String(Math.floor(sec / 60)), ss: String(sec % 60).padStart(2, "0") });
+          setOpen(true);
+        }} />}
     </div>
   );
 }
 
-function ScoreForm({ w, onAdd, onCancel }) {
+function ScoreForm({ w, initial, onAdd, onCancel }) {
   const meta = TYPE_META[w.type] || TYPE_META.time;
   const [raw, setRaw] = useState(""); const [note, setNote] = useState(""); const [rx, setRx] = useState(true);
   const [err, setErr] = useState(null); const [busy, setBusy] = useState(false);
   // workout a tempo: minuti e secondi separati, oppure CAP + ripetizioni mancanti/fatte
-  const [mm, setMm] = useState(""); const [ss, setSs] = useState(""); const [cap, setCap] = useState(false); const [capReps, setCapReps] = useState("");
+  const [mm, setMm] = useState(initial?.mm ?? ""); const [ss, setSs] = useState(initial?.ss ?? ""); const [cap, setCap] = useState(!!initial?.cap); const [capReps, setCapReps] = useState("");
   const isTime = w.type === "time";
   const timeRaw = () => {
     if (cap) return /^\d+$/.test(capReps) ? `CAP+${Number(capReps)}` : "";

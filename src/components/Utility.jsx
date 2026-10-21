@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Percent, ArrowLeftRight } from "lucide-react";
+import { Percent, ArrowLeftRight, Timer as TimerIcon } from "lucide-react";
+import { TimerSetup, TimerScreen } from "./Timer";
 import { GREEN, CARD, LINE, MUTED, inp, pill, pillOn, h1 } from "../lib/theme";
 
 const LB = 0.45359237;
@@ -17,8 +18,20 @@ export default function Utility() {
   return (
     <div>
       <div style={{ ...h1, margin: "20px 0 16px" }}>Utility</div>
+      <TimerCard />
       <Percentuali />
       <Conversione />
+    </div>
+  );
+}
+
+function TimerCard() {
+  const [running, setRunning] = useState(null);
+  return (
+    <div style={box}>
+      <div style={head}><TimerIcon size={18} color={GREEN} /> Timer</div>
+      <TimerSetup onStart={setRunning} />
+      {running && <TimerScreen config={running} onClose={() => setRunning(null)} />}
     </div>
   );
 }
