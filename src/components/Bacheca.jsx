@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Paperclip, X, FileText, Download, Loader2, Reply } from "lucide-react";
+import { Send, Paperclip, X, FileText, Download, Loader2, Reply, Eye } from "lucide-react";
+import FileViewer from "./FileViewer";
 import { supabase } from "../supabaseClient";
 import { ACCEPT, checkFile, uploadAttachment, attachmentUrl, downloadFile, fmtBytes, isImageFile } from "../lib/files";
 import { GREEN, CARD, LINE, MUTED, RED, BG, inp, btnGreen, btnGhost } from "../lib/theme";
@@ -170,6 +171,8 @@ function Attachment({ m }) {
   const [busy, setBusy] = useState(false);
   const url = attachmentUrl(m.allegato_path);
   const isImg = (m.allegato_tipo || "").startsWith("image/");
+  const isPdf = /pdf/i.test(m.allegato_tipo || "") || /\.pdf$/i.test(m.allegato_nome || "");
+  const [view, setView] = useState(false);
   const save = async () => {
     setBusy(true);
     try { await downloadFile(url, m.allegato_nome, m.allegato_tipo); } catch { window.open(url, "_blank"); }
@@ -182,7 +185,10 @@ function Attachment({ m }) {
   );
   if (isImg) return (
     <div style={{ marginTop: 4 }}>
-      <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={m.allegato_nome} loading="lazy" style={{ display: "block", maxWidth: "100%", maxHeight: 260, borderRadius: 10 }} /></a>
+      <button onClick={() => setView(true)} aria-label={`Apri ${m.allegato_nome}`} style={{ display: "block", padding: 0, border: "none", background: "none", cursor: "zoom-in" }}>
+        <img src={url} alt={m.allegato_nome} loading="lazy" style={{ display: "block", maxWidth: "100%", maxHeight: 260, borderRadius: 10 }} />
+      </button>
+      {view && <FileViewer url={url} name={m.allegato_nome} type={m.allegato_tipo} onClose={() => setView(false)} />}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 6 }}>
         <span style={{ color: MUTED, fontSize: 11.5 }}>{fmtBytes(m.allegato_bytes || 0)}</span>{dlBtn}
       </div>
@@ -191,11 +197,13 @@ function Attachment({ m }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(0,0,0,0.25)", borderRadius: 10, padding: "8px 10px", marginTop: 4, minWidth: 200 }}>
       <FileText size={24} color={GREEN} style={{ flexShrink: 0 }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div onClick={isPdf ? () => setView(true) : undefined} style={{ flex: 1, minWidth: 0, cursor: isPdf ? "pointer" : "default" }}>
         <div style={{ color: "#fff", fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.allegato_nome}</div>
         <div style={{ color: MUTED, fontSize: 11.5 }}>{fmtBytes(m.allegato_bytes || 0)}</div>
       </div>
+      {isPdf && <button onClick={() => setView(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.1)", color: "#fff", border: "none", borderRadius: 10, padding: "7px 12px", fontWeight: 800, fontSize: 12.5, cursor: "pointer", flexShrink: 0 }}><Eye size={14} /> Apri</button>}
       {dlBtn}
+      {view && <FileViewer url={url} name={m.allegato_nome} type={m.allegato_tipo} onClose={() => setView(false)} />}
     </div>
   );
 }
