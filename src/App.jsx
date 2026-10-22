@@ -7,6 +7,7 @@ import { toValue } from "./lib/scoring";
 import { ingest, weekInfo, todayISO, shiftWeek, DAY_LABEL, prettyDate } from "./lib/weeks";
 import { notify, registerSW, syncPushName } from "./lib/push";
 import Novita from "./components/Novita";
+import { fetchTeamNames, similarName, normName } from "./lib/names";
 import { persistDay } from "./lib/db";
 import Coach, { coachCodeFromUrl, coachAllowed } from "./components/Coach";
 import Home from "./components/Home";
@@ -244,7 +245,14 @@ function Main() {
     const linked = records.filter(r => r.scoreId === e._key);
     if (linked.length) { await supabase.from("personal_records").delete().eq("score_id", e._key); setRecords(p => p.filter(r => r.scoreId !== e._key)); }
   };
-  const rename = () => { const n = prompt("Il tuo nome", name); if (n?.trim()) { setName(n.trim()); store.set("athlete:name", n.trim()); } };
+  const rename = async () => {
+    const n = prompt("Il tuo nome (usa sempre lo stesso: punteggi e record sono legati al nome)", name)?.trim();
+    if (!n || n === name) return;
+    const names = await fetchTeamNames().catch(() => []);
+    const s = similarName(n, names);
+    const final = s && confirm(`Nel team c'è già "${s}". Sei tu?`) ? s : n;
+    setName(final); store.set("athlete:name", final);
+  };
 
   if (loading) return <Shell><div style={{ minHeight: "80vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}><AppIcon size={84} style={{ animation: "fade .5s ease both" }} /><Wordmark size={20} /></div></Shell>;
   if (!name || !entered) return <Shell><Splash name={name} onEnter={(n, target) => {
@@ -313,8 +321,16 @@ function Shell({ children }) {
 // La prima volta chiede anche il nome.
 function Splash({ name, onEnter }) {
   const [v, setV] = useState("");
+  const [names, setNames] = useState([]);
+  const [ask, setAsk] = useState(null);   // nome esistente simile a quello scritto
   const needName = !name;
-  const go = (target) => { const n = needName ? v.trim() : name; if (!n) return; onEnter(n, target); };
+  useEffect(() => { if (needName) fetchTeamNames().then(setNames).catch(() => {}); }, [needName]);
+  const go = (target, force) => {
+    const n = needName ? (force || v.trim()) : name; if (!n) return;
+    if (needName && !force) { const s = similarName(n, names); if (s) { setAsk(s); return; } }
+    onEnter(n, target);
+  };
+  const shown = names.filter(n => !v.trim() || normName(n).includes(normName(v))).slice(0, 12);
   return (
     <div className="fade" style={{ minHeight: "92vh", display: "flex", flexDirection: "column", justifyContent: "center", paddingBottom: 24 }}>
       <div style={{ position: "relative", display: "flex", justifyContent: "center", marginBottom: 26 }}>
@@ -326,8 +342,24 @@ function Splash({ name, onEnter }) {
       {needName ? (
         <div style={{ background: CARD, border: `1px solid ${LINE}`, borderRadius: 20, padding: 16 }}>
           <label style={{ color: MUTED, fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase" }}>Come ti chiami?</label>
-          <input value={v} onChange={e => setV(e.target.value)} onKeyDown={e => e.key === "Enter" && go("home")} placeholder="Nome e cognome" style={{ ...inp, width: "100%", marginTop: 8 }} autoFocus />
-          <button onClick={() => go("home")} style={{ ...btnGreen, width: "100%", justifyContent: "center", marginTop: 10, padding: 15, fontSize: 17 }}>Entra</button>
+          <input value={v} onChange={e => { setV(e.target.value); setAsk(null); }} onKeyDown={e => e.key === "Enter" && go("home")} placeholder="Nome e cognome" style={{ ...inp, width: "100%", marginTop: 8 }} autoFocus />
+          {ask ? (
+            <div className="fade" style={{ marginTop: 10, background: "rgba(184,255,44,0.08)", border: "1px solid rgba(184,255,44,0.35)", borderRadius: 14, padding: 12 }}>
+              <div style={{ color: "#fff", fontSize: 14.5, lineHeight: 1.45 }}>Nel team c'è già <b style={{ color: GREEN }}>{ask}</b>. Sei tu?</div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button onClick={() => go("home", ask)} style={{ ...btnGreen, flex: 1, justifyContent: "center" }}>Sì, sono io</button>
+                <button onClick={() => { const n = v.trim(); setAsk(null); onEnter(n, "home"); }} style={{ ...btnGhost, flex: 1, justifyContent: "center", color: "#fff" }}>No, sono nuovo</button>
+              </div>
+            </div>
+          ) : <button onClick={() => go("home")} style={{ ...btnGreen, width: "100%", justifyContent: "center", marginTop: 10, padding: 15, fontSize: 17 }}>Entra</button>}
+          {shown.length > 0 && !ask && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ color: MUTED, fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Sei già nel team? Tocca il tuo nome</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {shown.map(n => <button key={n} onClick={() => go("home", n)} style={{ background: "#1c1c1c", border: `1px solid ${LINE}`, color: "#fff", borderRadius: 999, padding: "7px 12px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>{n}</button>)}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div>
