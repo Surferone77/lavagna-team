@@ -88,7 +88,7 @@ export default function Home({ name, week, entries, done: doneSet = new Set(), o
           <div style={h}><Flame size={13} color={GREEN} /> Allenamento di oggi</div>
           {todayDay && td.total > 0 && <Ring pct={td.pct} size={58} stroke={7} font={13} />}
         </div>
-        {todayDay && td.total > 0 && <div style={{ color: MUTED, fontSize: 12.5, margin: "-6px 0 8px" }}>{td.pct === 100 ? "Tutto fatto, grande! 💪" : `${td.n} di ${td.total} blocchi completati · tocca il cerchio per segnarli`}{todayDur.label && <><br /><span style={{ color: "#ddd", fontWeight: 700 }}>⏱ Durata stimata: {todayDur.label}</span></>}</div>}
+        {todayDay && td.total > 0 && <div style={{ color: MUTED, fontSize: 12.5, margin: "-6px 0 8px" }}>{td.pct === 100 ? "Tutto fatto, grande! 💪" : `${td.n} di ${td.total} blocchi completati · tocca il cerchio per segnarli`}{todayDur.label && <><br /><span style={{ color: "#ddd", fontWeight: 700 }}>⏱ Durata stimata: {todayDur.label}</span>{todayDur.alt && <span> · oppure recupero attivo {todayDur.alt}</span>}</>}</div>}
         {todayDay ? <>
           {todayDay.workouts.map(w => {
             const meta = TYPE_META[w.type];
