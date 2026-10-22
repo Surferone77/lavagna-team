@@ -4,7 +4,9 @@ import { supabase, supabaseConfigured } from "./supabaseClient";
 import { GREEN, BG, CARD, LINE, MUTED, RED, FONT, inp, btnGreen, btnGhost } from "./lib/theme";
 import { AppIcon, ShieldMark, Wordmark } from "./components/Logo";
 import { toValue } from "./lib/scoring";
-import { ingest, weekInfo, todayISO, shiftWeek } from "./lib/weeks";
+import { ingest, weekInfo, todayISO, shiftWeek, DAY_LABEL, prettyDate } from "./lib/weeks";
+import { notify, registerSW, syncPushName } from "./lib/push";
+import Novita from "./components/Novita";
 import { persistDay } from "./lib/db";
 import Coach, { coachCodeFromUrl, coachAllowed } from "./components/Coach";
 import Home from "./components/Home";
@@ -73,6 +75,9 @@ function Main() {
   const [records, setRecords] = useState([]);          // record personali visibili (pubblici + i miei privati)
   const [profile, setProfile] = useState(null);        // nome dell'atleta di cui vedo il profilo
   const [toast, setToast] = useState(null);
+  const [news, setNews] = useState([]);                // novità dell'app (changelog)
+  const [page, setPage] = useState(null);              // pagina extra: "novita"
+  const [newsSeen, setNewsSeen] = useState(() => store.get("news:seen") || "");
   const nameRef = useRef(name); nameRef.current = name;
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState(null);
@@ -130,7 +135,23 @@ function Main() {
     const { data, error } = await supabase.from("workout_done").select("workout_id").eq("athlete", who);
     if (!error) setDone(new Set((data || []).map(r => r.workout_id)));
   };
-  useEffect(() => { loadDone(name); }, [name]);
+  useEffect(() => { loadDone(name); syncPushName(name).catch(() => {}); }, [name]);
+
+  // Novità dell'app + apertura da notifica (?tab=bacheca / calendario / novita)
+  useEffect(() => {
+    supabase.from("changelog").select("*").order("created_at", { ascending: false }).limit(30).then(({ data }) => setNews(data || []));
+    registerSW();
+    const openUrl = (href) => {
+      const q = new URL(href, location.href).searchParams.get("tab");
+      if (q === "novita") { setPage("novita"); setTab("home"); }
+      else if (["bacheca", "calendario", "utility", "home"].includes(q)) { setPage(null); setProfile(null); setSub(null); setTab(q); }
+    };
+    if (location.search.includes("tab=")) { openUrl(location.href); history.replaceState(null, "", location.pathname); }
+    const onMsg = (e) => { if (e.data?.type === "open") openUrl(e.data.url); };
+    navigator.serviceWorker?.addEventListener("message", onMsg);
+    return () => navigator.serviceWorker?.removeEventListener("message", onMsg);
+  }, []);
+  const openNews = () => { setPage("novita"); setProfile(null); setSub(null); setTab("home"); window.scrollTo(0, 0); if (news[0]) { setNewsSeen(news[0].id); store.set("news:seen", news[0].id); } };
   const setBlockDone = async (w, on) => {
     const had = done.has(w.id);
     if (on === had) return;
@@ -172,6 +193,7 @@ function Main() {
     if (error) return error;
     putWeek(wk.id, wk);
     setCalWeek(wk.id); setCalDay(day.dayKey); setTab("calendario"); setSub(null);
+    notify("workout", `✏️ Aggiornato ${DAY_LABEL[day.dayKey]?.toLowerCase() || "un giorno"}`, `${name} ha ${day.workouts?.length ? "aggiornato" : "modificato"} l'allenamento del ${prettyDate(day.date || todayISO())}`, "/?tab=calendario", name);
     return null;
   };
 
@@ -192,6 +214,7 @@ function Main() {
     const { error } = await supabase.from("weeks").upsert({ id: wk.id, label: wk.label, data: wk, updated_at: new Date().toISOString() });
     if (error) return "Salvataggio non riuscito: " + error.message;
     putWeek(wk.id, wk); setSub(null); setTab("calendario"); openWeek(wk.id);
+    notify("workout", "💪 Nuova programmazione", `${wk.label} è online`, "/?tab=calendario", name);
     return null;
   };
 
@@ -235,8 +258,9 @@ function Main() {
   else if (tab === "carica") body = <UploadPanel key={uploadDate || "oggi"} initialDate={uploadDate} currentWeek={weeks[weekInfo(uploadDate || todayISO()).weekId]}
     onAdd={saveDay} onCancel={() => setTab("home")} onImportJson={() => setSub("import")} />;
   else if (tab === "bacheca") body = <Bacheca name={name} />;
+  else if (page === "novita") body = <Novita items={news} onBack={() => setPage(null)} />;
   else if (profile && tab !== "carica") body = <Profilo athlete={profile} me={name} records={records} onBack={() => setProfile(null)}
-    onAdd={addRecord} onRemove={removeRecord} onSetPrivate={setRecordPrivate} onRename={rename} />;
+    onAdd={addRecord} onRemove={removeRecord} onSetPrivate={setRecordPrivate} onRename={rename} onOpenNews={openNews} />;
   else if (tab === "utility") body = <Utility name={name} records={records} />;
   else if (tab === "calendario") body = <Calendario weekId={calWeek} week={calWeekData} dayKey={calDay} setDayKey={setCalDay}
     onShift={(d) => openWeek(shiftWeek(calWeek, d))} onToday={() => openWeek(thisWeek)}
@@ -245,9 +269,10 @@ function Main() {
     records={records} onOpenAthlete={openProfile} />;
   else body = <Home name={name} week={weeks[thisWeek]} entries={entries} done={done} onToggleDone={toggleDone} onOpenDay={goDay} onRename={() => openProfile(name)}
     records={records} onOpenAthlete={openProfile}
-    onUpload={() => { setUploadDate(null); setTab("carica"); }} onBacheca={() => setTab("bacheca")} />;
+    onUpload={() => { setUploadDate(null); setTab("carica"); }} onBacheca={() => setTab("bacheca")}
+    latestNews={news[0] && news[0].id !== newsSeen ? news[0] : null} onOpenNews={openNews} />;
 
-  const go = (k) => { setSub(null); setProfile(null); if (k === "carica") setUploadDate(null); if (k === "calendario" && tab !== "calendario") openWeek(thisWeek); setTab(k); };
+  const go = (k) => { setSub(null); setProfile(null); setPage(null); if (k === "carica") setUploadDate(null); if (k === "calendario" && tab !== "calendario") openWeek(thisWeek); setTab(k); };
   return (
     <Shell>
       {loadErr && <div style={{ color: RED, fontSize: 13, marginTop: 12 }}>{loadErr}</div>}

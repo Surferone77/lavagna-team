@@ -55,6 +55,10 @@ const db = {
     ["Marco", "lift", "Back Squat", "weight", 1, 140, "140", "2026-10-18", false], ["Giulia", "engine", "Corsa 5 km", "time", null, 1395, "23:15", "2026-10-15", false],
     ["Giulia", "lift", "Snatch", "weight", 1, 55, "55", "2026-10-08", false], ["Luca", "bench", "Murph", "time", null, 2950, "49:10", "2026-09-28", true],
   ].map(([athlete, category, exercise, kind, rm, value, raw, record_date, priv], i) => ({ id: `pr${i}`, athlete, category, exercise, kind, rm, value, raw, record_date, note: "", private: priv, score_id: null, created_at: new Date(Date.now() - (20 - i) * 3600e3).toISOString() })),
+  changelog: [
+    { id: "n2", version: "1.4", title: "Condividi i WOD su Instagram", body: "Su ogni blocco c'è l'icona Condividi: PNG trasparente da incollare come adesivo nelle storie, oppure storia 9:16 pronta.", created_at: new Date(Date.now() - 864e5).toISOString() },
+    { id: "n1", version: "1.3", title: "Cardio ⇄ macchine", body: "In Utility: equivalenze tra corsa, row, ski, bike erg e assault bike.", created_at: new Date(Date.now() - 3 * 864e5).toISOString() },
+  ],
   comunicazioni: [
     { id: "c1", utente: "Giulia", messaggio: "Domani alle 18:30 chi c'è? Porto i sacchi per il sled 💪", created_at: new Date(Date.now() - 5 * 3600e3).toISOString() },
     { id: "c2", utente: "Marco", messaggio: "Presente. Metcon di oggi brutale.", created_at: new Date(Date.now() - 2 * 3600e3).toISOString() },
@@ -141,6 +145,7 @@ const DEMO_WODS = [
 ];
 let demoCall = 0;
 export async function callFunction(_name, body) {
+  if (_name === "send-push") { (window.__pushes ||= []).push(body); return { sent: 0 }; }
   await new Promise(r => setTimeout(r, 900 + Math.random() * 900));
   const i = demoCall++ % DEMO_WODS.length;
   return {

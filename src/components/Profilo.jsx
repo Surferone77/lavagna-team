@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, Plus, Lock, Unlock, Trash2, Trophy, PencilLine, Check, X, ChevronDown } from "lucide-react";
+import { ChevronLeft, Plus, Lock, Unlock, Trash2, Trophy, PencilLine, Check, X, ChevronDown, Sparkles, ChevronRight } from "lucide-react";
+import Notifiche from "./Notifiche";
 import { CATS, CAT_LABEL, CATALOG, RMS, groupRecords, recTitle, wouldBePR, isBetter, findExercise } from "../lib/records";
 import { toValue, display } from "../lib/scoring";
 import { todayISO, prettyDate } from "../lib/weeks";
@@ -11,7 +12,7 @@ const fullDate = (iso) => `${prettyDate(iso)} ${iso.slice(0, 4)}`;
 const box = { background: CARD, border: `1px solid ${LINE}`, borderRadius: 18, marginBottom: 10, overflow: "hidden" };
 
 // Pagina profilo: i miei record (tutti) oppure quelli pubblici di un compagno
-export default function Profilo({ athlete, me, records, onBack, onAdd, onRemove, onSetPrivate, onRename }) {
+export default function Profilo({ athlete, me, records, onBack, onAdd, onRemove, onSetPrivate, onRename, onOpenNews }) {
   const self = athlete === me;
   const rows = records.filter(r => r.athlete === athlete && (self || !r.private));
   const groups = useMemo(() => groupRecords(rows).sort((a, b) => (b.last.date > a.last.date ? 1 : -1)), [rows]);
@@ -93,6 +94,13 @@ export default function Profilo({ athlete, me, records, onBack, onAdd, onRemove,
           </div>
         );
       })}
+
+      {self && <div style={{ marginTop: 22 }}>
+        <Notifiche name={me} />
+        {onOpenNews && <button onClick={onOpenNews} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: CARD, border: `1px solid ${LINE}`, borderRadius: 18, padding: 14, cursor: "pointer", textAlign: "left", color: "#fff", fontWeight: 800, fontSize: 15 }}>
+          <Sparkles size={17} color={GREEN} /> <span style={{ flex: 1 }}>Novità dell'app</span> <ChevronRight size={16} color={MUTED} />
+        </button>}
+      </div>}
     </div>
   );
 }

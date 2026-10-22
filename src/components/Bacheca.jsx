@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Paperclip, X, FileText, Download, Loader2, Reply, Eye, MoreHorizontal, Pencil, Trash2, Check, Ban } from "lucide-react";
 import FileViewer from "./FileViewer";
+import { notify } from "../lib/push";
 import { supabase } from "../supabaseClient";
 import { ACCEPT, ATTACH_BUCKET, checkFile, uploadAttachment, attachmentUrl, downloadFile, fmtBytes, isImageFile } from "../lib/files";
 import { GREEN, CARD, LINE, MUTED, RED, BG, inp, btnGreen, btnGhost } from "../lib/theme";
@@ -81,6 +82,7 @@ export default function Bacheca({ name }) {
       const reply = replyTo ? { reply_to: replyTo.id, reply_utente: replyTo.utente, reply_testo: previewText(replyTo).slice(0, 200) } : {};
       const { error } = await supabase.from("comunicazioni").insert({ utente: name, messaggio: msg, ...extra, ...reply });
       if (error) throw new Error("Messaggio non inviato.");
+      notify("bacheca", `💬 ${name}`, msg ? msg.slice(0, 140) : `📎 ${file?.name || "allegato"}`, "/?tab=bacheca", name);
       setText(""); setFile(null); setReplyTo(null); load();
     } catch (e) {
       setErr(e.message || "Messaggio non inviato.");

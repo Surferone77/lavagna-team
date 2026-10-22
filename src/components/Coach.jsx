@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, ImagePlus, Loader2, Check, RotateCw, X, Send
 import { mapLimit } from "../lib/images";
 import { newItem, readOne } from "../lib/reader";
 import { persistDay } from "../lib/db";
+import { notify } from "../lib/push";
 import { supabase } from "../supabaseClient";
 import { DAY_ORDER, DAY_LABEL, weekInfo, weekDates, shiftWeek, coachTargetWeek, assignDays, mergeWorkouts, prettyDate } from "../lib/weeks";
 import { GREEN, CARD, LINE, MUTED, RED, btnGreen, btnGhost } from "../lib/theme";
@@ -79,6 +80,8 @@ export default function Coach() {
       supabase.storage.from("screenshots").upload(`${weekId}/${days[it.key]?.dayKey}/${Date.now()}-${it.key}-${i}.jpg`, t.blob, { contentType: "image/jpeg", upsert: true }).catch(() => {});
     setPublished(groups.map(g => ({ dayKey: g.dayKey, n: mergeWorkouts(g.items.map(it => it.workouts)).length })));
     setPhase("done");
+    const giorni = groups.map(g => DAY_LABEL[g.dayKey]).filter(Boolean);
+    notify("workout", `💪 Programma della ${info.label.split(" · ")[0].toLowerCase()} online`, `Giada ha pubblicato: ${giorni.join(", ")}. Segna i tuoi punteggi!`, "/?tab=calendario");
   };
 
   const restart = () => { setItems([]); setDays({}); setPublished([]); setPhase("start"); };

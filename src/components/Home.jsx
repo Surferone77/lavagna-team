@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Camera, ChevronRight, MessageSquare, Trophy, Flame } from "lucide-react";
+import { Camera, ChevronRight, MessageSquare, Trophy, Flame, Sparkles } from "lucide-react";
+import Notifiche from "./Notifiche";
 import { supabase } from "../supabaseClient";
 import { storageUsageMB, PHOTO_LIMITS } from "../lib/photos";
 import { display, TYPE_META } from "../lib/scoring";
@@ -16,9 +17,10 @@ const initials = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]
 const box = { background: CARD, border: `1px solid ${LINE}`, borderRadius: 20, padding: 18, marginBottom: 14 };
 const h = { color: MUTED, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 6, marginBottom: 10 };
 
-export default function Home({ name, week, entries, done: doneSet = new Set(), onToggleDone, records = [], onOpenAthlete, onOpenDay, onUpload, onBacheca, onRename }) {
+export default function Home({ name, week, entries, done: doneSet = new Set(), onToggleDone, records = [], onOpenAthlete, latestNews, onOpenNews, onOpenDay, onUpload, onBacheca, onRename }) {
   const [msgs, setMsgs] = useState([]);
   const [usage, setUsage] = useState(null);
+  const [pushLater, setPushLater] = useState(() => { try { return localStorage.getItem("push:later") === "1"; } catch { return false; } });
   const today = todayISO();
   const info = weekInfo(today);
   const todayDay = week?.days?.find(d => d.key === info.dayKey);
@@ -53,6 +55,18 @@ export default function Home({ name, week, entries, done: doneSet = new Set(), o
         <div style={{ color: MUTED, fontSize: 13.5, fontWeight: 600 }}>{DAY_LABEL[info.dayKey]} {prettyDate(today)} · {info.label.split(" · ")[0]}</div>
         <div style={{ ...h1, marginTop: 4 }}>Ciao {name.split(" ")[0]}</div>
       </div>
+
+      {latestNews && (
+        <button onClick={onOpenNews} className="fade" style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "rgba(184,255,44,0.1)", border: "1px solid rgba(184,255,44,0.4)", borderRadius: 16, padding: "11px 14px", marginBottom: 14, cursor: "pointer", textAlign: "left" }}>
+          <Sparkles size={18} color={GREEN} style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", color: GREEN, fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>Novità</span>
+            <span style={{ display: "block", color: "#fff", fontSize: 14.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{latestNews.title}</span>
+          </span>
+          <ChevronRight size={16} color={GREEN} />
+        </button>
+      )}
+      {!pushLater && <Notifiche name={name} compact onDismiss={() => { setPushLater(true); try { localStorage.setItem("push:later", "1"); } catch { /* */ } }} />}
 
       <div className="fade" style={{ ...box, position: "relative", overflow: "hidden", borderColor: todayDay ? "rgba(184,255,44,0.35)" : LINE, background: todayDay ? "linear-gradient(160deg, #1b2410 0%, #141414 45%)" : CARD }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
