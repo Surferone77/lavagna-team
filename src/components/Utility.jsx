@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Percent, ArrowLeftRight, Timer as TimerIcon, ChevronLeft } from "lucide-react";
+import { Percent, ArrowLeftRight, Timer as TimerIcon, ChevronLeft, Bike } from "lucide-react";
 import { TimerSetup, TimerScreen } from "./Timer";
 import { GREEN, CARD, LINE, MUTED, inp, pill, pillOn, h1 } from "../lib/theme";
 import { groupRecords, est1RM } from "../lib/records";
@@ -20,6 +20,7 @@ const TOOLS = [
   { key: "timer", title: "Timer", sub: "For Time, AMRAP, EMOM, Tabata…", Icon: TimerIcon },
   { key: "perc", title: "Percentuali", sub: "Dal 50% al 100% del massimale", Icon: Percent },
   { key: "conv", title: "Libbre ⇄ chili", sub: "Conversione e pesi comuni", Icon: ArrowLeftRight },
+  { key: "cardio", title: "Cardio ⇄ macchine", sub: "Corsa, row, ski, bike erg, assault bike", Icon: Bike },
 ];
 
 export default function Utility({ name = "", records = [] }) {
@@ -35,6 +36,7 @@ export default function Utility({ name = "", records = [] }) {
       {tool === "timer" && <div style={box}><TimerSetup onStart={setRunning} /></div>}
       {tool === "perc" && <Percentuali maxes={myMaxes(records, name)} />}
       {tool === "conv" && <Conversione />}
+      {tool === "cardio" && <Cardio />}
       {running && <TimerScreen config={running} onClose={() => setRunning(null)} />}
     </div>
   );
@@ -43,7 +45,7 @@ export default function Utility({ name = "", records = [] }) {
       <div style={{ ...h1, margin: "20px 0 16px" }}>Utility</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {TOOLS.map(({ key, title, sub, Icon }, i) => (
-          <button key={key} onClick={() => setTool(key)} style={{ gridColumn: i === 0 ? "1 / -1" : "auto", textAlign: "left", background: i === 0 ? "linear-gradient(150deg, #1b2410 0%, #141414 60%)" : CARD, border: `1px solid ${i === 0 ? "rgba(184,255,44,0.35)" : LINE}`, borderRadius: 20, padding: 18, cursor: "pointer", display: "flex", flexDirection: i === 0 ? "row" : "column", alignItems: i === 0 ? "center" : "flex-start", gap: 14, minHeight: i === 0 ? 0 : 140 }}>
+          <button key={key} onClick={() => setTool(key)} style={{ gridColumn: i === 0 || (i === TOOLS.length - 1 && TOOLS.length % 2 === 0) ? "1 / -1" : "auto", textAlign: "left", background: i === 0 ? "linear-gradient(150deg, #1b2410 0%, #141414 60%)" : CARD, border: `1px solid ${i === 0 ? "rgba(184,255,44,0.35)" : LINE}`, borderRadius: 20, padding: 18, cursor: "pointer", display: "flex", flexDirection: i === 0 ? "row" : "column", alignItems: i === 0 ? "center" : "flex-start", gap: 14, minHeight: i === 0 ? 0 : 140 }}>
             <span style={{ width: i === 0 ? 64 : 48, height: i === 0 ? 64 : 48, borderRadius: 16, background: "rgba(184,255,44,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Icon size={i === 0 ? 32 : 24} color={GREEN} strokeWidth={2.2} />
             </span>
@@ -153,6 +155,63 @@ function Conversione() {
         ))}
       </div>
       <div style={{ color: "#666", fontSize: 11.5, marginTop: 10 }}>1 lb = 0.4536 kg · Nei WOD "100/70#" significa 100 lb uomini / 70 lb donne.</div>
+    </div>
+  );
+}
+
+// ---- Cardio ⇄ macchine: equivalenze usate nei box (base = metri di corsa) ----
+// 400 m corsa = 500 m row = 500 m ski = 1000 m bike erg = 20/15 cal assault/echo bike
+const MACHINES = [
+  { key: "run", label: "Corsa", unit: "m", k: 1 },
+  { key: "row", label: "Row", unit: "m", k: 1.25 },
+  { key: "ski", label: "SkiErg", unit: "m", k: 1.25 },
+  { key: "bike", label: "BikeErg", unit: "m", k: 2.5 },
+  { key: "assM", label: "Assault / Echo (uomini)", unit: "cal", k: 1 / 20 },
+  { key: "assF", label: "Assault / Echo (donne)", unit: "cal", k: 15 / 400 },
+];
+const PRESETS = { m: [200, 400, 800, 1000, 1600, 5000], cal: [10, 15, 20, 30, 50] };
+const roundM = (m) => m >= 1000 ? Math.round(m / 50) * 50 : Math.round(m / 10) * 10;
+const showDist = (m) => m >= 1000 ? `${fmt(m / 1000, 2)} km` : `${Math.round(m)} m`;
+
+function Cardio() {
+  const [from, setFrom] = useState("run");
+  const [v, setV] = useState("1000");
+  const src = MACHINES.find(x => x.key === from);
+  const val = num(v);
+  const runM = val ? val / src.k : null;
+  return (
+    <div>
+      <div style={box}>
+        <div style={head}><Bike size={18} color={GREEN} /> Cardio ⇄ macchine</div>
+        <div style={{ color: MUTED, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Da</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+          {MACHINES.map(x => <button key={x.key} onClick={() => { setFrom(x.key); setV(String(x.unit === "cal" ? 20 : 1000)); }} style={{ ...pill, padding: "6px 10px", ...(from === x.key ? pillOn : {}) }}>{x.label.replace(" (uomini)", " ♂").replace(" (donne)", " ♀")}</button>)}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input value={v} onChange={e => setV(e.target.value)} inputMode="decimal" aria-label="Quantità" style={{ ...inp, width: 140, fontSize: 22, fontWeight: 900 }} />
+          <span style={{ color: MUTED, fontSize: 15, fontWeight: 700 }}>{src.unit === "m" ? "metri" : "calorie"}</span>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+          {PRESETS[src.unit].map(n => <button key={n} onClick={() => setV(String(n))} style={{ ...pill, padding: "4px 10px", ...(num(v) === n ? pillOn : {}) }}>{src.unit === "m" ? showDist(n) : `${n} cal`}</button>)}
+        </div>
+        {runM ? (
+          <div style={{ marginTop: 14, display: "grid", gap: 6 }}>
+            {MACHINES.filter(x => x.key !== from).map(x => {
+              const out = runM * x.k;
+              return (
+                <div key={x.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1c1c1c", borderRadius: 12, padding: "11px 14px" }}>
+                  <span style={{ color: "#ddd", fontSize: 14.5, fontWeight: 700 }}>{x.label}</span>
+                  <span style={{ color: GREEN, fontSize: 20, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{x.unit === "m" ? showDist(roundM(out)) : `${Math.max(1, Math.round(out))} cal`}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : <div style={{ color: MUTED, fontSize: 13.5, marginTop: 12 }}>Inserisci una distanza o delle calorie.</div>}
+      </div>
+      <div style={{ ...box, color: MUTED, fontSize: 12.5, lineHeight: 1.55 }}>
+        <b style={{ color: "#ddd" }}>Come si calcola:</b> 400 m di corsa = 500 m row = 500 m SkiErg = 1000 m BikeErg = 20 cal (uomini) / 15 cal (donne) di Assault o Echo Bike. Sono le equivalenze più usate nei box, non una regola ufficiale.
+        <br /><br /><b style={{ color: "#ddd" }}>Il criterio più giusto è il tempo:</b> se 1 km di corsa ti richiede 5 minuti, fai circa 5 minuti di macchina allo stesso sforzo. Chi è più pesante va più veloce su row e bike; le calorie dell'Assault salgono molto con la velocità.
+      </div>
     </div>
   );
 }
