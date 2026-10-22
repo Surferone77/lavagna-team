@@ -16,12 +16,14 @@ const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { sta
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
-  const priv = Deno.env.get("VAPID_PRIVATE_KEY");
-  if (!priv) return json({ error: "VAPID_PRIVATE_KEY non impostata sul server" }, 500);
+  // la chiave è 43 caratteri base64url: la estraggo anche se è stata incollata con spazi o testo attorno
+  const raw = Deno.env.get("VAPID_PRIVATE_KEY") || "";
+  const priv = (raw.match(/[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/) || [])[0];
+  if (!priv) return json({ error: raw ? `VAPID_PRIVATE_KEY non valida (lunghezza ${raw.length}, attesi 43 caratteri)` : "VAPID_PRIVATE_KEY non impostata sul server" }, 500);
   try {
     const { type, title, body, url, exclude } = await req.json();
     if (!TYPES.includes(type) || !title) return json({ error: "type o title non validi" }, 400);
-    webpush.setVapidDetails("https://the-hybrid-one.netlify.app", VAPID_PUBLIC, priv.trim());
+    webpush.setVapidDetails("https://the-hybrid-one.netlify.app", VAPID_PUBLIC, priv);
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: subs, error } = await sb.from("push_subscriptions").select("*");
     if (error) return json({ error: error.message }, 500);
