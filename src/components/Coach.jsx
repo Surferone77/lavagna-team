@@ -34,6 +34,8 @@ export default function Coach({ by = "Giada", embedded = false, onClose }) {
   const [err, setErr] = useState(null);
   const [published, setPublished] = useState([]);
   const fileRef = useRef(null);
+  const pickDay = useRef(null);      // giorno per cui sto scegliendo gli screenshot (null = tutti insieme)
+  const pickDayOf = useRef({});      // key -> giorno scelto al caricamento
   const info = weekInfo(weekDates(weekId)[0]);
   const dates = weekDates(weekId);
 
@@ -49,21 +51,28 @@ export default function Coach({ by = "Giada", embedded = false, onClose }) {
     const merged = all.map(it => res.find(r => r.key === it.key) || it);
     const ok = merged.filter(it => it.status === "done");
     // i giorni già scelti a mano restano; gli altri si ricalcolano in ordine
-    const auto = Object.fromEntries(assignDays(ok, weekId).map(a => [a.key, a]));
-    setDays(prev => { const n = { ...auto }; for (const k in prev) if (prev[k].manual && n[k]) n[k] = prev[k]; return n; });
+    const auto = Object.fromEntries(assignDays(ok.filter(it => !pickDayOf.current[it.key]), weekId).map(a => [a.key, a]));
+    for (const it of ok) if (pickDayOf.current[it.key]) auto[it.key] = { key: it.key, dayKey: pickDayOf.current[it.key], guessed: false, manual: true };
+    // unisco: le letture in parallelo (un giorno dopo l'altro) non devono cancellarsi a vicenda
+    setDays(prev => { const n = { ...prev, ...auto }; for (const k in prev) if (prev[k].manual) n[k] = prev[k]; return n; });
     setPhase("review");
   };
 
   const onPick = (files) => {
     const fresh = Array.from(files || []).filter(f => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name)).map(newItem);
     if (!fresh.length) return;
+    const target = pickDay.current;
+    if (target) {
+      for (const it of fresh) pickDayOf.current[it.key] = target;
+      setDays(d => ({ ...d, ...Object.fromEntries(fresh.map(it => [it.key, { key: it.key, dayKey: target, guessed: false, manual: true }])) }));
+    }
     const all = [...items, ...fresh];
     setItems(all);
     readAll(fresh, all);
   };
 
   const remove = (key) => { setItems(l => l.filter(x => x.key !== key)); setDays(d => { const n = { ...d }; delete n[key]; return n; }); };
-  const setDay = (key, dayKey) => setDays(d => ({ ...d, [key]: { key, dayKey, guessed: false, manual: true } }));
+  const setDay = (key, dayKey) => { pickDayOf.current[key] = dayKey; setDays(d => ({ ...d, [key]: { key, dayKey, guessed: false, manual: true } })); };
 
   const ok = items.filter(it => it.status === "done");
   const groups = DAY_ORDER.map(k => ({ dayKey: k, items: ok.filter(it => days[it.key]?.dayKey === k) })).filter(g => g.items.length);
@@ -84,7 +93,7 @@ export default function Coach({ by = "Giada", embedded = false, onClose }) {
     notify("workout", `💪 Programma della ${info.label.split(" · ")[0].toLowerCase()} online`, `${by} ha pubblicato: ${giorni.join(", ")}. Segna i tuoi punteggi!`, "/?tab=calendario", embedded ? by : null);
   };
 
-  const restart = () => { setItems([]); setDays({}); setPublished([]); setPhase("start"); };
+  const restart = () => { setItems([]); setDays({}); setPublished([]); setPhase("start"); pickDayOf.current = {}; };
   const waText = `💪 The Hybrid One · programma della ${info.label.toLowerCase()} online! Segna i tuoi punteggi qui: ${teamUrl()}`;
 
   const header = embedded ? (
@@ -130,78 +139,78 @@ export default function Coach({ by = "Giada", embedded = false, onClose }) {
     </div>
   );
 
-  if (phase === "start") return (
-    <div>
-      {header}{weekPicker}{picker}
-      <button onClick={() => fileRef.current?.click()} style={{ width: "100%", background: GREEN, color: "#0b0b0b", border: "none", borderRadius: 22, padding: "38px 16px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-        <ImagePlus size={44} />
-        <span style={{ fontSize: 20, fontWeight: 800 }}>Carica gli screenshot</span>
-        <span style={{ fontSize: 13.5, fontWeight: 600, opacity: 0.8 }}>Selezionali tutti insieme, in ordine da lunedì a domenica</span>
-      </button>
-      <div style={{ color: "#ccc", fontSize: 13, marginTop: 14, lineHeight: 1.5, background: CARD, border: `1px solid ${LINE}`, borderRadius: 14, padding: "10px 12px" }}>
-        <b style={{ color: "#fff" }}>Niente data sugli screenshot?</b> Nessun problema: se il giorno non è scritto li metto in ordine (il primo è lunedì, poi martedì…) e te li mostro in giallo. Puoi cambiare il giorno di ognuno con un tocco prima di pubblicare.
-      </div>
-      <div style={{ color: MUTED, fontSize: 13, marginTop: 16, lineHeight: 1.5, display: "flex", gap: 8 }}>
-        <ShieldCheck size={16} color={GREEN} style={{ flexShrink: 0, marginTop: 2 }} />
-        <span>I giorni vengono riconosciuti in automatico. Nomi e risultati personali vengono tolti: il programma vale per tutto il team.</span>
-      </div>
-    </div>
-  );
-
+  // Una riga per giorno: ogni giorno ha i suoi screenshot (anche tanti). "Tutti insieme" solo se hanno la data scritta.
+  const pickFor = (dayKey) => { pickDay.current = dayKey; fileRef.current?.click(); };
   const reading = items.filter(it => it.status === "reading" || it.status === "pending").length;
+  const unread = items.filter(it => it.status === "error").length;
+  const thumb = (it) => {
+    const d = days[it.key];
+    const mismatch = it.status === "done" && it.day && d?.manual && it.day !== d.dayKey;
+    return (
+      <div key={it.key} style={{ width: 64, flexShrink: 0 }}>
+        <div style={{ position: "relative", width: 64, height: 86, borderRadius: 9, overflow: "hidden", background: "#111", border: `1.5px solid ${it.status === "error" ? RED : d?.guessed || mismatch ? AMBER : it.status === "done" ? "rgba(184,255,44,0.5)" : LINE}` }}>
+          {it.preview && <img src={it.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />}
+          {(it.status === "reading" || it.status === "pending") && <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center" }}><Loader2 size={18} className="spin" color={GREEN} /></div>}
+          {it.status === "done" && <div style={{ position: "absolute", left: 4, bottom: 4, background: "rgba(0,0,0,.75)", color: GREEN, fontSize: 10.5, fontWeight: 900, borderRadius: 6, padding: "1px 5px" }}>{it.workouts.length} bl.</div>}
+          {it.status !== "reading" && <button onClick={() => remove(it.key)} aria-label="Togli" style={{ position: "absolute", top: 3, right: 3, width: 20, height: 20, borderRadius: 10, background: "rgba(0,0,0,.7)", border: "none", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}><X size={12} /></button>}
+        </div>
+        {it.status === "error"
+          ? <button onClick={() => readAll([it], items)} style={{ width: "100%", marginTop: 4, background: "none", border: "none", color: RED, fontSize: 11, fontWeight: 800, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}><RotateCw size={11} /> Riprova</button>
+          : <select value={d?.dayKey || ""} onChange={e => setDay(it.key, e.target.value)} aria-label="Sposta in un altro giorno"
+              style={{ width: "100%", marginTop: 4, background: "#1c1c1c", color: d?.guessed || mismatch ? AMBER : "#bbb", border: `1px solid ${LINE}`, borderRadius: 7, fontSize: 11, padding: "2px 2px" }}>
+              {DAY_ORDER.map(k => <option key={k} value={k}>{SHORT[k]} · {DAY_LABEL[k].slice(0, 3)}</option>)}
+            </select>}
+        {mismatch && <div style={{ color: AMBER, fontSize: 10, lineHeight: 1.2, marginTop: 2 }}>c'è scritto {DAY_LABEL[it.day].toLowerCase()}</div>}
+      </div>
+    );
+  };
+
   return (
     <div>
       {header}{weekPicker}{picker}
-      {phase === "reading" && <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
-        <Loader2 size={18} className="spin" color={GREEN} /> Leggo gli screenshot… {items.length - reading}/{items.length}
+      <div style={{ color: "#ccc", fontSize: 13.5, lineHeight: 1.5, marginBottom: 12 }}>
+        Tocca <b style={{ color: "#fff" }}>+</b> su ogni giorno e scegli i suoi screenshot (anche più di uno). L'AI legge gli esercizi e toglie nomi e risultati personali.
+      </div>
+      {reading > 0 && <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 14, fontWeight: 600, marginBottom: 10 }}>
+        <Loader2 size={16} className="spin" color={GREEN} /> Leggo gli screenshot… {items.length - reading}/{items.length}
       </div>}
-      {phase === "review" && guessedCount > 0 && <div style={{ color: AMBER, fontSize: 13.5, marginBottom: 12, lineHeight: 1.4 }}>
-        Su {guessedCount} screenshot il giorno non era scritto: l'ho messo in ordine. Controlla i giorni in giallo.
+      {guessedCount > 0 && <div style={{ color: AMBER, fontSize: 13, marginBottom: 10, lineHeight: 1.4 }}>
+        Su {guessedCount} screenshot il giorno non era scritto e li ho messi in ordine: controlla quelli in giallo e spostali se serve.
       </div>}
 
-      {items.map(it => {
-        const d = days[it.key];
+      {DAY_ORDER.map((k, i) => {
+        const its = items.filter(it => days[it.key]?.dayKey === k || (!days[it.key] && pickDayOf.current[it.key] === k));
+        const blocks = mergeWorkouts(its.filter(it => it.status === "done").map(it => it.workouts));
         return (
-          <div key={it.key} style={{ display: "flex", gap: 12, background: CARD, border: `1px solid ${it.status === "error" ? RED : d?.guessed ? "rgba(240,184,74,0.5)" : LINE}`, borderRadius: 14, padding: 10, marginBottom: 10 }}>
-            <div style={{ width: 62, height: 84, borderRadius: 8, overflow: "hidden", background: "#111", flexShrink: 0 }}>
-              {it.preview && <img src={it.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />}
+          <div key={k} style={{ background: CARD, border: `1px solid ${its.length ? "rgba(184,255,44,0.25)" : LINE}`, borderRadius: 16, padding: 12, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ color: "#fff", fontSize: 15.5, fontWeight: 800 }}>{DAY_LABEL[k]}</span>
+                <span style={{ color: MUTED, fontSize: 12.5 }}> · {prettyDate(dates[i])}</span>
+                {blocks.length > 0 && <div style={{ color: MUTED, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{blocks.length} {blocks.length === 1 ? "blocco" : "blocchi"}: {blocks.map(w => w.title).join(" · ")}</div>}
+              </div>
+              <button onClick={() => pickFor(k)} disabled={phase === "publishing"} aria-label={`Aggiungi screenshot di ${DAY_LABEL[k]}`}
+                style={{ width: 40, height: 40, borderRadius: 20, background: its.length ? "#1f1f1f" : GREEN, color: its.length ? GREEN : "#0b0b0b", border: its.length ? `1px solid rgba(184,255,44,0.4)` : "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                <ImagePlus size={19} />
+              </button>
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {it.status === "done" && <>
-                <div style={{ color: "#fff", fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.workouts.map(w => w.title).join(" · ") || "Nessun blocco trovato"}</div>
-                <div style={{ color: MUTED, fontSize: 12, marginBottom: 8 }}>{it.workouts.length} {it.workouts.length === 1 ? "blocco" : "blocchi"}</div>
-                <div style={{ display: "flex", gap: 4 }}>
-                  {DAY_ORDER.map((k, i) => {
-                    const on = d?.dayKey === k;
-                    return <button key={k} onClick={() => setDay(it.key, k)} aria-label={`${DAY_LABEL[k]} ${prettyDate(dates[i])}`} style={{
-                      flex: 1, minWidth: 0, padding: "6px 0", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer",
-                      background: on ? (d.guessed ? "rgba(240,184,74,0.18)" : "rgba(184,255,44,0.18)") : "#1f1f1f",
-                      color: on ? (d.guessed ? AMBER : GREEN) : MUTED, border: `1px solid ${on ? (d.guessed ? AMBER : GREEN) : "transparent"}` }}>{SHORT[k]}</button>;
-                  })}
-                </div>
-              </>}
-              {(it.status === "reading" || it.status === "pending") && <div style={{ color: MUTED, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6, height: "100%" }}><Loader2 size={14} className="spin" /> Lettura in corso…</div>}
-              {it.status === "error" && <div>
-                <div style={{ color: RED, fontSize: 13 }}>Non riuscito: {it.error}</div>
-                <button onClick={() => readAll([it], items)} style={{ ...btnGhost, marginTop: 6, fontSize: 13 }}><RotateCw size={13} /> Riprova</button>
-              </div>}
-            </div>
-            {it.status !== "reading" && <button onClick={() => remove(it.key)} aria-label="Togli" style={{ background: "none", border: "none", color: "#666", cursor: "pointer", padding: 2, alignSelf: "flex-start" }}><X size={16} /></button>}
+            {its.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", marginTop: 10, paddingBottom: 2 }}>{its.map(thumb)}</div>}
           </div>
         );
       })}
 
-      {removed.length > 0 && phase !== "reading" && <div style={{ color: MUTED, fontSize: 12, margin: "4px 0 12px", display: "flex", gap: 6 }}>
+      {removed.length > 0 && <div style={{ color: MUTED, fontSize: 12, margin: "4px 0 12px", display: "flex", gap: 6 }}>
         <ShieldCheck size={14} color={GREEN} style={{ flexShrink: 0 }} /> <span>Esclusi perché personali: {removed.map(r => r.split(" — ")[0]).join(", ")}</span>
       </div>}
+      {unread > 0 && <div style={{ color: RED, fontSize: 13, marginBottom: 8 }}>{unread} screenshot non letti: tocca Riprova sotto l'immagine.</div>}
       {err && <div style={{ color: RED, fontSize: 13, marginBottom: 10 }}>{err}</div>}
 
-      {phase !== "reading" && <>
-        <button onClick={publish} disabled={!groups.length || phase === "publishing"} style={{ ...btnGreen, width: "100%", justifyContent: "center", padding: 16, fontSize: 17, marginTop: 6, opacity: groups.length && phase !== "publishing" ? 1 : 0.5 }}>
-          {phase === "publishing" ? <><Loader2 size={18} className="spin" /> Pubblico…</> : <><Check size={18} /> Pubblica {groups.length} {groups.length === 1 ? "giorno" : "giorni"}</>}
-        </button>
-        <button onClick={() => fileRef.current?.click()} style={{ ...btnGhost, width: "100%", justifyContent: "center", marginTop: 10 }}><ImagePlus size={15} /> Aggiungi altri screenshot</button>
-      </>}
+      <button onClick={publish} disabled={!groups.length || reading > 0 || phase === "publishing"} style={{ ...btnGreen, width: "100%", justifyContent: "center", padding: 16, fontSize: 17, marginTop: 6, opacity: groups.length && !reading && phase !== "publishing" ? 1 : 0.5 }}>
+        {phase === "publishing" ? <><Loader2 size={18} className="spin" /> Pubblico…</> : groups.length ? <><Check size={18} /> Pubblica {groups.length} {groups.length === 1 ? "giorno" : "giorni"}</> : <>Aggiungi gli screenshot dei giorni</>}
+      </button>
+      <button onClick={() => pickFor(null)} style={{ background: "none", border: "none", color: MUTED, fontSize: 12.5, textDecoration: "underline", cursor: "pointer", padding: "12px 0 0", width: "100%" }}>
+        Gli screenshot hanno il giorno scritto sopra? Caricali tutti insieme
+      </button>
     </div>
   );
 }
