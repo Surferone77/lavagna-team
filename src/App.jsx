@@ -151,6 +151,9 @@ function Main() {
     navigator.serviceWorker?.addEventListener("message", onMsg);
     return () => navigator.serviceWorker?.removeEventListener("message", onMsg);
   }, []);
+  // carica le settimane che mancano (per il riepilogo mensile)
+  const pendingWeeks = useRef(new Set());
+  const ensureWeeks = (ids) => { for (const id of ids) if (!(id in weeksRef.current) && !pendingWeeks.current.has(id)) { pendingWeeks.current.add(id); loadWeek(id).catch(() => putWeek(id, null)).finally(() => pendingWeeks.current.delete(id)); } };
   const openNews = () => { setPage("novita"); setProfile(null); setSub(null); setTab("home"); window.scrollTo(0, 0); if (news[0]) { setNewsSeen(news[0].id); store.set("news:seen", news[0].id); } };
   const setBlockDone = async (w, on) => {
     const had = done.has(w.id);
@@ -260,7 +263,8 @@ function Main() {
   else if (tab === "bacheca") body = <Bacheca name={name} />;
   else if (page === "novita") body = <Novita items={news} onBack={() => setPage(null)} />;
   else if (profile && tab !== "carica") body = <Profilo athlete={profile} me={name} records={records} onBack={() => setProfile(null)}
-    onAdd={addRecord} onRemove={removeRecord} onSetPrivate={setRecordPrivate} onRename={rename} onOpenNews={openNews} />;
+    onAdd={addRecord} onRemove={removeRecord} onSetPrivate={setRecordPrivate} onRename={rename} onOpenNews={openNews}
+    done={done} entries={entries} weeks={weeks} ensureWeeks={ensureWeeks} />;
   else if (tab === "utility") body = <Utility name={name} records={records} />;
   else if (tab === "calendario") body = <Calendario weekId={calWeek} week={calWeekData} dayKey={calDay} setDayKey={setCalDay}
     onShift={(d) => openWeek(shiftWeek(calWeek, d))} onToday={() => openWeek(thisWeek)}
@@ -270,7 +274,8 @@ function Main() {
   else body = <Home name={name} week={weeks[thisWeek]} entries={entries} done={done} onToggleDone={toggleDone} onOpenDay={goDay} onRename={() => openProfile(name)}
     records={records} onOpenAthlete={openProfile}
     onUpload={() => { setUploadDate(null); setTab("carica"); }} onBacheca={() => setTab("bacheca")}
-    latestNews={news[0] && news[0].id !== newsSeen ? news[0] : null} onOpenNews={openNews} />;
+    latestNews={news[0] && news[0].id !== newsSeen ? news[0] : null} onOpenNews={openNews}
+    weeks={weeks} ensureWeeks={ensureWeeks} />;
 
   const go = (k) => { setSub(null); setProfile(null); setPage(null); if (k === "carica") setUploadDate(null); if (k === "calendario" && tab !== "calendario") openWeek(thisWeek); setTab(k); };
   return (

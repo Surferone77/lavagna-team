@@ -10,6 +10,7 @@ import { AppIcon, Wordmark } from "./Logo";
 import { Ring, DoneCheck } from "./Progress";
 import { progress } from "../lib/progress";
 import { prEvents, recTitle } from "../lib/records";
+import { computeRecap, shiftMonth, thisMonth, monthWeekIds, monthName } from "../lib/recap";
 import { showVal, prBadge } from "./Profilo";
 
 const initials = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join("");
@@ -17,7 +18,7 @@ const initials = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]
 const box = { background: CARD, border: `1px solid ${LINE}`, borderRadius: 20, padding: 18, marginBottom: 14 };
 const h = { color: MUTED, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 6, marginBottom: 10 };
 
-export default function Home({ name, week, entries, done: doneSet = new Set(), onToggleDone, records = [], onOpenAthlete, latestNews, onOpenNews, onOpenDay, onUpload, onBacheca, onRename }) {
+export default function Home({ name, week, entries, done: doneSet = new Set(), onToggleDone, records = [], onOpenAthlete, latestNews, onOpenNews, weeks = {}, ensureWeeks, onOpenDay, onUpload, onBacheca, onRename }) {
   const [msgs, setMsgs] = useState([]);
   const [usage, setUsage] = useState(null);
   const [pushLater, setPushLater] = useState(() => { try { return localStorage.getItem("push:later") === "1"; } catch { return false; } });
@@ -40,6 +41,11 @@ export default function Home({ name, week, entries, done: doneSet = new Set(), o
   const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
   const teamPR = events.filter(e => e.date >= since).slice(0, 5);
   const myCount = new Set(records.filter(r => r.athlete === name).map(r => `${r.exercise}|${r.rm}`)).size;
+  // nei primi 7 giorni del mese: riepilogo del mese appena finito
+  const lastMonth = shiftMonth(thisMonth(), -1);
+  const showRecap = Number(today.slice(8)) <= 7 && ensureWeeks;
+  useEffect(() => { if (showRecap) ensureWeeks(monthWeekIds(lastMonth)); }, [showRecap, lastMonth]);
+  const recap = showRecap && monthWeekIds(lastMonth).every(id => id in weeks) ? computeRecap(lastMonth, { weeks, done: doneSet, entries, name, prEvents: prEvents(records.filter(r => r.athlete === name)) }) : null;
   const ago = (iso) => { const d = Math.round((Date.parse(today) - Date.parse(iso)) / 864e5); return d <= 0 ? "oggi" : d === 1 ? "ieri" : `${d} g fa`; };
   const recent = mine.map(e => ({ e, w: all.find(w => w.id === e.wod) })).filter(x => x.w).sort((a, b) => b.e.ts - a.e.ts).slice(0, 4);
 
@@ -64,6 +70,13 @@ export default function Home({ name, week, entries, done: doneSet = new Set(), o
             <span style={{ display: "block", color: "#fff", fontSize: 14.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{latestNews.title}</span>
           </span>
           <ChevronRight size={16} color={GREEN} />
+        </button>
+      )}
+      {recap?.hasData && (
+        <button onClick={() => onOpenAthlete?.(name)} className="fade" style={{ width: "100%", textAlign: "left", background: "linear-gradient(150deg, #1b2410 0%, #141414 60%)", border: "1px solid rgba(184,255,44,0.35)", borderRadius: 20, padding: 16, marginBottom: 14, cursor: "pointer" }}>
+          <div style={{ color: GREEN, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>📊 Il tuo {monthName(lastMonth)}</div>
+          <div style={{ color: "#fff", fontSize: 20, fontWeight: 900, letterSpacing: -0.3 }}>{recap.sessions} {recap.sessions === 1 ? "sessione" : "sessioni"} · {recap.pct}% completato{recap.prs.length ? ` · ${recap.prs.length} PR` : ""}</div>
+          <div style={{ color: MUTED, fontSize: 12.5, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>Apri il riepilogo completo <ChevronRight size={13} /></div>
         </button>
       )}
       {!pushLater && <Notifiche name={name} compact onDismiss={() => { setPushLater(true); try { localStorage.setItem("push:later", "1"); } catch { /* */ } }} />}

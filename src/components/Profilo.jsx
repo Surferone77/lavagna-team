@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, Plus, Lock, Unlock, Trash2, Trophy, PencilLine, Check, X, ChevronDown, Sparkles, ChevronRight } from "lucide-react";
 import Notifiche from "./Notifiche";
+import Riepilogo from "./Riepilogo";
 import { CATS, CAT_LABEL, CATALOG, RMS, groupRecords, recTitle, wouldBePR, isBetter, findExercise } from "../lib/records";
 import { toValue, display } from "../lib/scoring";
 import { todayISO, prettyDate } from "../lib/weeks";
@@ -12,7 +13,7 @@ const fullDate = (iso) => `${prettyDate(iso)} ${iso.slice(0, 4)}`;
 const box = { background: CARD, border: `1px solid ${LINE}`, borderRadius: 18, marginBottom: 10, overflow: "hidden" };
 
 // Pagina profilo: i miei record (tutti) oppure quelli pubblici di un compagno
-export default function Profilo({ athlete, me, records, onBack, onAdd, onRemove, onSetPrivate, onRename, onOpenNews }) {
+export default function Profilo({ athlete, me, records, onBack, onAdd, onRemove, onSetPrivate, onRename, onOpenNews, done, entries = [], weeks = {}, ensureWeeks }) {
   const self = athlete === me;
   const rows = records.filter(r => r.athlete === athlete && (self || !r.private));
   const groups = useMemo(() => groupRecords(rows).sort((a, b) => (b.last.date > a.last.date ? 1 : -1)), [rows]);
@@ -38,6 +39,7 @@ export default function Profilo({ athlete, me, records, onBack, onAdd, onRemove,
         {self && <button onClick={onRename} style={{ ...pill, padding: "7px 11px", display: "inline-flex", alignItems: "center", gap: 5 }}><PencilLine size={14} /> Nome</button>}
       </div>
 
+      {self && ensureWeeks && <Riepilogo name={me} done={done || new Set()} entries={entries} records={records} weeks={weeks} ensureWeeks={ensureWeeks} />}
       {self && !adding && <button onClick={() => setAdding({})} style={{ ...btnGreen, width: "100%", justifyContent: "center", marginBottom: 14 }}><Plus size={17} /> Aggiungi record</button>}
       {self && adding && <RecordForm preset={adding.preset} rows={rows} me={me} onCancel={() => setAdding(null)} onSave={async (rec) => { const res = await onAdd(rec); if (!res?.error) setAdding(null); return res; }} />}
 
