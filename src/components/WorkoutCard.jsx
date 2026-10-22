@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { TimerScreen, TimerSheet } from "./Timer";
 import { suggestTimer, sanitizeTimer } from "../lib/timer";
-import { Plus, Trophy, X, Check, Trash2, ChevronDown, ChevronUp, NotebookPen , Timer as TimerIcon } from "lucide-react";
+import { Plus, Trophy, X, Check, Trash2, ChevronDown, ChevronUp, NotebookPen , Timer as TimerIcon, Share2 } from "lucide-react";
 import PhotoStrip from "./PhotoStrip";
 import NotesSection from "./NotesSection";
 import { prBadge } from "./Profilo";
+import ShareSheet from "./ShareSheet";
 import { TYPE_META, toValue, display, formatHint, buildBoard } from "../lib/scoring";
 import { GREEN, CARD, LINE, MUTED, RED, inp, btnGreen, btnGhost, btnTextMuted, pill, pillOn } from "../lib/theme";
 
@@ -17,6 +18,7 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
   const [showHist, setShowHist] = useState(false);
   const [timer, setTimer] = useState(null);     // configurazione del timer in corso
   const [sheet, setSheet] = useState(false);    // scelta del timer aperta
+  const [sharing, setSharing] = useState(false);
   const [prefill, setPrefill] = useState(null); // tempo arrivato dal timer
   const suggestion = useMemo(() => suggestTimer(w), [w]);
   const [division, setDivision] = useState("all");
@@ -25,6 +27,8 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
   const Icon = meta.icon;
   const board = useMemo(() => buildBoard(entries, w.type, division), [entries, w.type, division]);
   const hasScaled = entries.some(e => !e.rx);
+  const mineBest = isNote ? null : buildBoard(entries.filter(e => e.name === name), w.type, "all")[0];
+  const scoreText = mineBest ? `${display(w.type, mineBest.value, mineBest.raw)} ${mineBest.rx ? "RX" : "Scaled"}${prIds.has(mineBest._key) ? " · PR 🏆" : ""}` : null;
 
   return (
     <div className="fade" style={{ background: CARD, border: `1px solid ${done ? "rgba(184,255,44,0.55)" : LINE}`, transition: "border-color .3s", borderRadius: 20, marginBottom: 14, overflow: "hidden" }}>
@@ -36,7 +40,10 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
             {onToggleDone && <button onClick={onToggleDone} aria-pressed={done} aria-label={done ? "Blocco completato, tocca per annullare" : "Segna il blocco come completato"}
               style={{ display: "inline-flex", alignItems: "center", gap: 5, background: done ? GREEN : "transparent", color: done ? "#0b0b0b" : "#cfcfcf", border: `1px solid ${done ? GREEN : "#444"}`, borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer", transition: "all .2s" }}>
               <Check size={14} strokeWidth={3} /> {done ? "Fatto" : "Segna fatto"}</button>}
+            <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setSharing(true)} aria-label="Condividi questo blocco" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "transparent", color: "#cfcfcf", border: "1px solid #444", borderRadius: 999, width: 32, height: 30, cursor: "pointer", padding: 0 }}><Share2 size={14} /></button>
             {<button onClick={() => setSheet(true)} aria-label="Apri timer per questo blocco" style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(184,255,44,0.12)", color: GREEN, border: "1px solid rgba(184,255,44,0.3)", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}><TimerIcon size={14} /> Timer</button>}
+            </div>
             </div>
             <div style={{ color: "#fff", fontSize: 17.5, fontWeight: 800, lineHeight: 1.2, letterSpacing: -0.2 }}>{w.title}</div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, background: "#222", color: isNote ? MUTED : GREEN, fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 999 }}>
@@ -94,6 +101,7 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
       {sheet && <TimerSheet w={w} suggestion={suggestion} onClose={() => setSheet(false)}
         onStart={(cfg) => { setSheet(false); setTimer(cfg); }}
         onAssign={onSetTimer ? async (cfg) => { await onSetTimer(w, sanitizeTimer(cfg)); } : undefined} />}
+      {sharing && <ShareSheet w={w} scoreText={scoreText} onClose={() => setSharing(false)} />}
       {timer && <TimerScreen config={timer} title={w.title} onClose={() => setTimer(null)}
         onResult={isNote ? undefined : (sec, isCap) => {
           setTimer(null);
