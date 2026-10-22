@@ -1,15 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Check, ImagePlus, RotateCw, X, Loader2, AlertTriangle, PencilLine, ShieldCheck } from "lucide-react";
 import { prepareImage, mapLimit } from "../lib/images";
-import { weekInfo, todayISO, mergeWorkouts, DAY_LABEL } from "../lib/weeks";
+import { weekInfo, todayISO, mergeWorkouts, DAY_LABEL, DAY_ORDER, weekDates } from "../lib/weeks";
 import { supabase } from "../supabaseClient";
 import WorkoutEditor from "./WorkoutEditor";
-import { GREEN, CARD, LINE, MUTED, RED, inp, btnGreen, btnGhost, lbl } from "../lib/theme";
+import { GREEN, CARD, LINE, MUTED, RED, inp, btnGreen, btnGhost, lbl, pill, pillOn } from "../lib/theme";
+import Coach from "./Coach";
 
 import { newItem, readOne } from "../lib/reader";
 
-export default function UploadPanel({ currentWeek, initialDate, onAdd, onCancel, onImportJson }) {
-  const [date, setDate] = useState(initialDate || todayISO());
+// Carica: un giorno alla volta oppure tutta la settimana (stesso flusso della pagina coach)
+export default function UploadPanel(props) {
+  const [mode, setMode] = useState("day");
+  const tabs = (
+    <div style={{ display: "flex", gap: 6, marginTop: 16 }}>
+      {[["day", "Un giorno"], ["week", "Settimana intera"]].map(([k, l]) => <button key={k} onClick={() => setMode(k)} style={{ ...pill, flex: 1, padding: "9px 10px", fontSize: 14, ...(mode === k ? pillOn : {}) }}>{l}</button>)}
+    </div>
+  );
+  return <>{tabs}{mode === "week" ? <Coach embedded by={props.name || "Qualcuno"} onClose={props.onCancel} /> : <UploadDay {...props} />}</>;
+}
+
+function UploadDay({ currentWeek, initialDate, onAdd, onCancel, onImportJson }) {
+  const [date, setDateRaw] = useState(initialDate || todayISO());
+  const [dateTouched, setDateTouched] = useState(!!initialDate);
+  const setDate = (d) => { setDateRaw(d); setDateTouched(true); };
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState("pick"); // pick | review
@@ -58,6 +72,13 @@ export default function UploadPanel({ currentWeek, initialDate, onAdd, onCancel,
     const done = await process(todo);
     const all = items.map(it => done.find(d => d.key === it.key) || it);
     const ok = all.filter(it => it.status === "done");
+    // giorno dallo screenshot: data scritta, oppure il giorno della settimana (nella settimana scelta)
+    if (!dateTouched && ok.length) {
+      const found = ok.map(it => it.date).find(d => d && /^\d{4}-\d{2}-\d{2}$/.test(d));
+      const day = ok.map(it => it.day).find(Boolean);
+      if (found) setDateRaw(found);
+      else if (day) setDateRaw(weekDates(weekInfo(date).weekId)[DAY_ORDER.indexOf(day)]);
+    }
     if (!ok.length) { setErr("Nessuno screenshot letto. Controlla la connessione oppure inserisci i blocchi a mano."); return; }
     setWorkouts(mergeWorkouts(ok.map(it => it.workouts)));
     setPhase("review");
@@ -80,6 +101,9 @@ export default function UploadPanel({ currentWeek, initialDate, onAdd, onCancel,
       supabase.storage.from("screenshots").upload(`${info.weekId}/${info.dayKey}/${Date.now()}-${it.key}-${i}.jpg`, t.blob, { contentType: "image/jpeg", upsert: true }).catch(() => {});
     }
   };
+
+  // appena aggiungi gli screenshot li leggo, senza bisogno di toccare "Leggi con AI"
+  useEffect(() => { if (phase === "pick" && !busy && items.some(it => !it.status || it.status === "pending")) readAll(); }, [items.length]); // eslint-disable-line
 
   const removedAll = [...new Set(items.flatMap(it => it.removed || []))];
   const aiDate = items.map(it => it.date).find(d => d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d !== date);

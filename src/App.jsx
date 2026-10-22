@@ -267,7 +267,7 @@ function Main() {
   if (sub === "import") body = <ImportPanel onImport={importWeek} onCancel={() => setSub(null)} />;
   else if (sub === "edit" && calDayData) body = <EditDay week={calWeekData} day={calDayData} onSave={saveDay} onCancel={() => setSub(null)} />;
   else if (tab === "carica") body = <UploadPanel key={uploadDate || "oggi"} initialDate={uploadDate} currentWeek={weeks[weekInfo(uploadDate || todayISO()).weekId]}
-    onAdd={saveDay} onCancel={() => setTab("home")} onImportJson={() => setSub("import")} />;
+    onAdd={saveDay} onCancel={() => setTab("home")} onImportJson={() => setSub("import")} name={name} />;
   else if (tab === "bacheca") body = <Bacheca name={name} />;
   else if (page === "novita") body = <Novita items={news} onBack={() => setPage(null)} />;
   else if (profile && tab !== "carica") body = <Profilo athlete={profile} me={name} records={records} onBack={() => setProfile(null)}

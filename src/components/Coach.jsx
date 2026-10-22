@@ -26,7 +26,7 @@ export function coachAllowed(code) {
 export const teamUrl = () => window.location.origin + window.location.pathname.replace(/\/coach\/?$/, "/");
 
 // Pagina della coach: carica gli screenshot della settimana e pubblica. Nient'altro.
-export default function Coach() {
+export default function Coach({ by = "Giada", embedded = false, onClose }) {
   const [weekId, setWeekId] = useState(coachTargetWeek());
   const [items, setItems] = useState([]);
   const [days, setDays] = useState({});        // key -> { dayKey, guessed }
@@ -81,13 +81,18 @@ export default function Coach() {
     setPublished(groups.map(g => ({ dayKey: g.dayKey, n: mergeWorkouts(g.items.map(it => it.workouts)).length })));
     setPhase("done");
     const giorni = groups.map(g => DAY_LABEL[g.dayKey]).filter(Boolean);
-    notify("workout", `💪 Programma della ${info.label.split(" · ")[0].toLowerCase()} online`, `Giada ha pubblicato: ${giorni.join(", ")}. Segna i tuoi punteggi!`, "/?tab=calendario");
+    notify("workout", `💪 Programma della ${info.label.split(" · ")[0].toLowerCase()} online`, `${by} ha pubblicato: ${giorni.join(", ")}. Segna i tuoi punteggi!`, "/?tab=calendario", embedded ? by : null);
   };
 
   const restart = () => { setItems([]); setDays({}); setPublished([]); setPhase("start"); };
   const waText = `💪 The Hybrid One · programma della ${info.label.toLowerCase()} online! Segna i tuoi punteggi qui: ${teamUrl()}`;
 
-  const header = (
+  const header = embedded ? (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20, marginBottom: 14 }}>
+      <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 800, margin: 0 }}>Carica la settimana</h1>
+      {onClose && <button onClick={onClose} style={btnGhost} aria-label="Chiudi"><X size={16} /></button>}
+    </div>
+  ) : (
     <div style={{ marginTop: 22, marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}><AppIcon size={36} /><Wordmark size={15} /><span style={{ marginLeft: "auto", color: "#0b0b0b", background: GREEN, fontSize: 10.5, fontWeight: 900, letterSpacing: 1, borderRadius: 999, padding: "3px 9px" }}>COACH</span></div>
       <div style={{ color: "#fff", fontSize: 28, fontWeight: 900, letterSpacing: -0.6, marginTop: 20 }}>Programma della settimana</div>
@@ -131,8 +136,11 @@ export default function Coach() {
       <button onClick={() => fileRef.current?.click()} style={{ width: "100%", background: GREEN, color: "#0b0b0b", border: "none", borderRadius: 22, padding: "38px 16px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
         <ImagePlus size={44} />
         <span style={{ fontSize: 20, fontWeight: 800 }}>Carica gli screenshot</span>
-        <span style={{ fontSize: 13.5, fontWeight: 600, opacity: 0.8 }}>Selezionali tutti insieme, da lunedì a domenica</span>
+        <span style={{ fontSize: 13.5, fontWeight: 600, opacity: 0.8 }}>Selezionali tutti insieme, in ordine da lunedì a domenica</span>
       </button>
+      <div style={{ color: "#ccc", fontSize: 13, marginTop: 14, lineHeight: 1.5, background: CARD, border: `1px solid ${LINE}`, borderRadius: 14, padding: "10px 12px" }}>
+        <b style={{ color: "#fff" }}>Niente data sugli screenshot?</b> Nessun problema: se il giorno non è scritto li metto in ordine (il primo è lunedì, poi martedì…) e te li mostro in giallo. Puoi cambiare il giorno di ognuno con un tocco prima di pubblicare.
+      </div>
       <div style={{ color: MUTED, fontSize: 13, marginTop: 16, lineHeight: 1.5, display: "flex", gap: 8 }}>
         <ShieldCheck size={16} color={GREEN} style={{ flexShrink: 0, marginTop: 2 }} />
         <span>I giorni vengono riconosciuti in automatico. Nomi e risultati personali vengono tolti: il programma vale per tutto il team.</span>
