@@ -162,11 +162,18 @@ function describe(c) {
 }
 
 // dimensione delle cifre in base allo schermo (funziona anche in orizzontale)
-function useDigitSize(chars) {
-  const calc = () => Math.max(40, Math.min((window.innerWidth * 0.92) / (chars * 0.68), window.innerHeight * 0.36));
+// In orizzontale su telefoni bassi i comandi vanno a destra e le cifre usano l'altezza libera
+const isLand = () => window.innerWidth > window.innerHeight && window.innerHeight < 560;
+function useDigitSize(chars, extra = 0) {
+  const calc = () => {
+    const w = window.innerWidth, h = window.innerHeight;
+    if (isLand()) return Math.max(40, Math.min(((w - 130) * 0.9) / (chars * 0.68), (h - 150 - extra) * 0.95));
+    return Math.max(40, Math.min((w * 0.92) / (chars * 0.68), h * 0.36));
+  };
   const [s, setS] = useState(calc);
-  useEffect(() => { const f = () => setS(calc()); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, [chars]);
-  return s;
+  const [land, setLand] = useState(isLand);
+  useEffect(() => { const f = () => { setS(calc()); setLand(isLand()); }; f(); window.addEventListener("resize", f); window.addEventListener("orientationchange", f); return () => { window.removeEventListener("resize", f); window.removeEventListener("orientationchange", f); }; }, [chars, extra]);
+  return [s, land];
 }
 
 // ---- Schermo intero, stile orologio da box ----
@@ -235,7 +242,7 @@ export function TimerScreen({ config, title, onClose, onResult }) {
   else if (st.done) clock = "00:00";
   else if (seg.kind === "prep") clock = `  :${String(Math.ceil(st.remaining)).padStart(2, "0")}`;
   else clock = fmtClock(seg.up ? st.inSeg : st.remaining);
-  const size = useDigitSize(clock.replace(":", "").length + 0.6);
+  const [size, land] = useDigitSize(clock.replace(":", "").length + 0.6, (config.mode === "sequence" ? 40 : 0) + (config.mode === "amrap" || resultSec !== null ? 50 : 0));
 
   const isSeq = config.mode === "sequence";
   const paused = !running && !notStarted && !st.done && resultSec === null;
@@ -258,13 +265,14 @@ export function TimerScreen({ config, title, onClose, onResult }) {
         <button onClick={() => { releaseWake(); onClose(); }} aria-label="Chiudi timer" style={iconBtn}><X size={20} /></button>
       </div>
 
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: land ? "row" : "column" }}>
       {/* orologio */}
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: size * 0.12 }}>
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: land ? 6 : size * 0.12 }}>
         <div onClick={() => { if (st.done) return; running ? pause() : play(); }} title={running ? "Tocca per mettere in pausa" : "Tocca per avviare"}
           style={{ opacity: blinkOff ? 0.35 : 1, transition: "opacity .08s", cursor: "pointer" }}>
           <SevenSeg text={clock} size={size} color={color} off="rgba(255,255,255,0.045)" label={clock} />
         </div>
-        <div style={{ color, fontWeight: 900, fontSize: Math.max(14, size * 0.16), letterSpacing: 4, textTransform: "uppercase" }}>{paused ? "Pausa" : phase}</div>
+        <div style={{ color, fontWeight: 900, fontSize: Math.max(14, size * 0.16), letterSpacing: 4, textTransform: "uppercase" }}>{paused ? "Pausa" : stopped !== null && !st.done ? "Fermato" : phase}</div>
         {isSeq && (() => {
           const cur = seg.kind === "prep" ? segs[1] : seg;
           const next = st.done ? null : segs[(seg.kind === "prep" ? 1 : st.i) + 1];
@@ -289,15 +297,18 @@ export function TimerScreen({ config, title, onClose, onResult }) {
         )}
       </div>
 
-      {/* comandi */}
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 22, padding: "8px 16px max(20px, env(safe-area-inset-bottom))" }}>
+      {/* comandi: sotto in verticale, a destra in orizzontale */}
+      <div style={land
+        ? { display: "flex", flexDirection: "column-reverse", justifyContent: "center", alignItems: "center", gap: 14, padding: "8px max(16px, env(safe-area-inset-right)) 12px 8px" }
+        : { display: "flex", justifyContent: "center", alignItems: "center", gap: 22, padding: "8px 16px max(20px, env(safe-area-inset-bottom))" }}>
         <button onClick={reset} aria-label="Azzera" style={ctrl("#151515", "#fff", 58)}><RotateCcw size={22} /></button>
         {running
           ? <button onClick={pause} aria-label="Pausa" style={ctrl("#fff", "#050505", 78)}><Pause size={32} fill="#050505" /></button>
           : <button onClick={play} disabled={st.done} aria-label={notStarted ? "Avvia" : "Riprendi"} style={{ ...ctrl(GREEN, "#050505", 78), opacity: st.done ? 0.35 : 1 }}><Play size={32} fill="#050505" style={{ marginLeft: 4 }} /></button>}
         {isForTime
           ? <button onClick={finish} disabled={notStarted || resultSec !== null} aria-label="Ho finito" style={{ ...ctrl("#151515", GREEN, 58), opacity: notStarted || resultSec !== null ? 0.35 : 1, fontSize: 12, fontWeight: 900, letterSpacing: 1 }}>STOP</button>
-          : <div style={{ width: 58 }} />}
+          : <div style={{ width: 58, height: land ? 0 : "auto" }} />}
+      </div>
       </div>
     </div>,
     document.body
