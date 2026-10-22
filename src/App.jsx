@@ -7,6 +7,7 @@ import { toValue } from "./lib/scoring";
 import { ingest, weekInfo, todayISO, shiftWeek, DAY_LABEL, prettyDate } from "./lib/weeks";
 import { notify, registerSW, syncPushName } from "./lib/push";
 import Novita from "./components/Novita";
+import GuestDay from "./components/GuestDay";
 import { fetchTeamNames, similarName, normName } from "./lib/names";
 import { persistDay } from "./lib/db";
 import Coach, { coachCodeFromUrl, coachAllowed } from "./components/Coach";
@@ -31,6 +32,9 @@ const session = {
 const rowToEntry = (r) => ({ _key: r.id, wod: r.workout_id, name: r.athlete, value: r.value, raw: r.raw, note: r.note, rx: r.rx, ts: new Date(r.created_at).getTime() });
 
 export default function App() {
+  // link del giorno per un ospite: mostra solo quel giorno, senza entrare nell'app
+  const guest = new URLSearchParams(window.location.search).get("giorno");
+  if (guest) return <Shell><GuestDay token={guest} /></Shell>;
   if (typeof __DEMO__ !== "undefined" && __DEMO__) return <DemoRoot />;
   return <Root />;
 }

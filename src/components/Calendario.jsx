@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, PencilLine, Camera } from "lucide-react";
+import { ChevronLeft, ChevronRight, PencilLine, Camera, Link2 } from "lucide-react";
+import ShareDaySheet from "./ShareDaySheet";
 import WorkoutCard from "./WorkoutCard";
 import { Bar } from "./Progress";
 import { progress } from "../lib/progress";
@@ -11,6 +12,7 @@ const SHORT = { lun: "L", mar: "M", mer: "M", gio: "G", ven: "V", sab: "S", dom:
 
 export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, onToday, entries, name, onAdd, onRemove, onEdit, onUpload, onSetTimer, done = new Set(), onToggleDone, records = [], onOpenAthlete }) {
   const [openForm, setOpenForm] = useState(null);
+  const [sharing, setSharing] = useState(false);
   const dates = weekDates(weekId);
   const today = todayISO();
   const info = weekInfo(dates[0]);
@@ -58,7 +60,10 @@ export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, o
           <div style={{ color: "#fff", fontWeight: 800, fontSize: 19 }}>{DAY_LABEL[dayKey]}</div>
           <div style={{ color: MUTED, fontSize: 12 }}>{prettyDate(date)}{day ? ` · ${day.workouts.length} ${day.workouts.length === 1 ? "blocco" : "blocchi"}` : ""}{dur.label && <span style={{ color: "#ddd", fontWeight: 700 }}> · ⏱ {dur.label}</span>}{dur.alt && <span> · oppure recupero attivo {dur.alt}</span>}</div>
         </div>
-        {day && <button onClick={onEdit} style={btnGhost} aria-label="Modifica giorno"><PencilLine size={16} /></button>}
+        {day && <div style={{ display: "flex", gap: 6 }}>
+          {day.workouts.length > 0 && <button onClick={() => setSharing(true)} style={btnGhost} aria-label="Condividi giorno con un ospite"><Link2 size={16} /></button>}
+          <button onClick={onEdit} style={btnGhost} aria-label="Modifica giorno"><PencilLine size={16} /></button>
+        </div>}
       </div>
       {prog.total > 0 && (
         <div style={{ background: CARD, border: `1px solid ${prog.pct === 100 ? "rgba(184,255,44,0.5)" : LINE}`, borderRadius: 14, padding: "10px 12px", marginBottom: 12 }}>
@@ -81,6 +86,7 @@ export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, o
         <WorkoutCard key={w.id} w={w} name={name} date={date} onSetTimer={onSetTimer} prIds={prIds} onOpenAthlete={onOpenAthlete} duration={fmtBlock(dur.blocks.find(b => b.w.id === w.id)?.est)} done={done.has(w.id)} onToggleDone={onToggleDone && (() => onToggleDone(w))} entries={entries.filter(e => e.wod === w.id)}
           open={openForm === w.id} setOpen={o => setOpenForm(o ? w.id : null)} onAdd={async (...a) => { const e = await onAdd(...a); if (!e) setOpenForm(null); return e; }} onRemove={onRemove} />
       ))}
+      {sharing && day && <ShareDaySheet weekId={weekId} day={day} date={date} label={`${DAY_LABEL[dayKey].toLowerCase()} ${prettyDate(date)}`} by={name} onClose={() => setSharing(false)} />}
       {day && day.workouts.length === 0 && <div style={{ color: MUTED, padding: 16 }}>Giorno di riposo.</div>}
     </div>
   );

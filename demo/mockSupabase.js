@@ -65,6 +65,9 @@ const db = {
   ],
 };
 
+// i giorni condivisi sopravvivono al ricaricamento della pagina (serve per provare il link ospite in demo)
+try { db.shared_days = JSON.parse(sessionStorage.getItem("mock:shared") || "[]"); } catch { db.shared_days = []; }
+const persistShared = () => { try { sessionStorage.setItem("mock:shared", JSON.stringify(db.shared_days)); } catch { /* */ } };
 const listeners = [];
 const files = {}; // storage finto: percorso -> URL locale
 const notify = (table, row) => listeners.filter(l => l.table === table).forEach(l => setTimeout(() => l.cb({ new: row }), 0));
@@ -77,6 +80,7 @@ function query(table) {
     if (st.op === "insert") {
       const items = (Array.isArray(st.payload) ? st.payload : [st.payload]).map(r => ({ id: `${table}${Date.now()}${Math.random().toString(36).slice(2, 6)}`, created_at: new Date().toISOString(), ...r }));
       rows.push(...items); items.forEach(r => notify(table, r));
+      if (table === "shared_days") persistShared();
       return { data: st.returning ? (st.single ? clone(items[0]) : clone(items)) : null, error: null };
     }
     if (st.op === "upsert") {
@@ -119,6 +123,13 @@ export const supabase = {
     return ch;
   },
   removeChannel() {},
+  async rpc(name, args) {
+    const rows = db.shared_days || (db.shared_days = []);
+    const r = rows.find(x => x.token === args.t);
+    if (name === "get_shared_day") return { data: r && !r.revoked && new Date(r.expires_at) > new Date() ? [clone(r)] : [], error: null };
+    if (name === "revoke_shared_day") { if (r) r.revoked = true; persistShared(); return { data: null, error: null }; }
+    return { data: null, error: { message: "rpc sconosciuta" } };
+  },
   storage: {
     from: () => ({
       upload: async (path, blob) => { files[path] = URL.createObjectURL(blob); return { data: { path }, error: null }; },

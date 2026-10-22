@@ -100,7 +100,10 @@ export function estimateBlock(w, entries = []) {
   const sug = suggestTimer(w);
   const c = sug.cfg;
   const strength = w.type === "weight" || /strength|forza|accessor/i.test(w.title || "");
-  const tx = textSeconds(w.detail, { strength });
+  // "3 sets" scritto solo nel formato: vale per tutto il testo
+  const tagSets = String(w.tag || "").match(/^\s*(\d{1,2})\s*(?:x\s*)?(sets?|rounds?|serie|giri)\b/i);
+  const hasHeader = /^\s*\d{1,2}\s*(?:x\s*)?(sets?|rounds?|serie|giri|round)\b/im.test(w.detail || "");
+  const tx = textSeconds(tagSets && !hasHeader ? `${tagSets[1]} sets:\n${w.detail || ""}` : w.detail, { strength });
   if (sug.source !== "base" && c.mode !== "fortime") {
     const s = timerSeconds(c);
     // una sequenza letta dal testo può perdere dei pezzi: se la lettura riga per riga trova di più, vale quella
