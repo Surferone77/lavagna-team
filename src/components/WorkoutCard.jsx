@@ -14,7 +14,7 @@ function Badge({ Icon, note }) {
     {note ? <NotebookPen size={19} color="#9a9a9a" /> : <Icon size={20} color={GREEN} strokeWidth={2.4} />}</div>;
 }
 
-export default function WorkoutCard({ w, name, date, entries, open, setOpen, onAdd, onRemove, onSetTimer, done = false, onToggleDone, prIds = new Set(), onOpenAthlete }) {
+export default function WorkoutCard({ w, name, date, entries, open, setOpen, onAdd, onRemove, onSetTimer, done = false, onToggleDone, prIds = new Set(), onOpenAthlete, duration }) {
   const [showHist, setShowHist] = useState(false);
   const [timer, setTimer] = useState(null);     // configurazione del timer in corso
   const [sheet, setSheet] = useState(false);    // scelta del timer aperta
@@ -46,6 +46,7 @@ export default function WorkoutCard({ w, name, date, entries, open, setOpen, onA
             </div>
             </div>
             <div style={{ color: "#fff", fontSize: 17.5, fontWeight: 800, lineHeight: 1.2, letterSpacing: -0.2 }}>{w.title}</div>
+            {duration && duration !== "0'" && <span title="Durata stimata" style={{ display: "inline-flex", alignItems: "center", gap: 3, marginTop: 6, marginRight: 6, background: "#222", color: "#cfcfcf", fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 999 }}>⏱ {duration}</span>}
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, background: "#222", color: isNote ? MUTED : GREEN, fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 999 }}>
               {isNote ? (w.tag || "Nota · senza punteggio") : <><Icon size={12} /> {w.tag && w.tag.toLowerCase().includes(meta.label.toLowerCase()) ? w.tag : [w.tag, meta.label].filter(Boolean).join(" · ")}</>}
             </div>

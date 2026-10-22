@@ -9,6 +9,7 @@ import { GREEN, CARD, LINE, MUTED, btnGreen, h1 } from "../lib/theme";
 import { AppIcon, Wordmark } from "./Logo";
 import { Ring, DoneCheck } from "./Progress";
 import { progress } from "../lib/progress";
+import { estimateDay } from "../lib/duration";
 import { prEvents, recTitle } from "../lib/records";
 import { computeRecap, shiftMonth, thisMonth, monthWeekIds, monthName } from "../lib/recap";
 import { showVal, prBadge } from "./Profilo";
@@ -37,6 +38,7 @@ export default function Home({ name, week, entries, done: doneSet = new Set(), o
   const mine = entries.filter(e => e.name === name);
   const wk = progress(all, doneSet);
   const td = progress(todayDay?.workouts, doneSet);
+  const todayDur = estimateDay(todayDay?.workouts || [], (w) => entries.filter(e => e.wod === w.id));
   const events = prEvents(records.filter(r => !r.private));
   const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
   const teamPR = events.filter(e => e.date >= since).slice(0, 5);
@@ -86,7 +88,7 @@ export default function Home({ name, week, entries, done: doneSet = new Set(), o
           <div style={h}><Flame size={13} color={GREEN} /> Allenamento di oggi</div>
           {todayDay && td.total > 0 && <Ring pct={td.pct} size={58} stroke={7} font={13} />}
         </div>
-        {todayDay && td.total > 0 && <div style={{ color: MUTED, fontSize: 12.5, margin: "-6px 0 8px" }}>{td.pct === 100 ? "Tutto fatto, grande! 💪" : `${td.n} di ${td.total} blocchi completati · tocca il cerchio per segnarli`}</div>}
+        {todayDay && td.total > 0 && <div style={{ color: MUTED, fontSize: 12.5, margin: "-6px 0 8px" }}>{td.pct === 100 ? "Tutto fatto, grande! 💪" : `${td.n} di ${td.total} blocchi completati · tocca il cerchio per segnarli`}{todayDur.label && <><br /><span style={{ color: "#ddd", fontWeight: 700 }}>⏱ Durata stimata: {todayDur.label}</span></>}</div>}
         {todayDay ? <>
           {todayDay.workouts.map(w => {
             const meta = TYPE_META[w.type];

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, PencilLine, Camera } from "lucide-react";
 import WorkoutCard from "./WorkoutCard";
 import { Bar } from "./Progress";
 import { progress } from "../lib/progress";
+import { estimateDay, fmtBlock } from "../lib/duration";
 import { DAY_ORDER, DAY_LABEL, weekDates, weekInfo, todayISO, prettyDate } from "../lib/weeks";
 import { GREEN, CARD, LINE, MUTED, btnGhost, btnGreen } from "../lib/theme";
 
@@ -18,6 +19,7 @@ export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, o
   const date = dates[DAY_ORDER.indexOf(dayKey)];
   const prog = progress(day?.workouts, done);
   const prIds = new Set(records.filter(r => r.scoreId).map(r => r.scoreId));
+  const dur = estimateDay(day?.workouts || [], (w) => entries.filter(e => e.wod === w.id));
 
   return (
     <div>
@@ -54,7 +56,7 @@ export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, o
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div>
           <div style={{ color: "#fff", fontWeight: 800, fontSize: 19 }}>{DAY_LABEL[dayKey]}</div>
-          <div style={{ color: MUTED, fontSize: 12 }}>{prettyDate(date)}{day ? ` · ${day.workouts.length} ${day.workouts.length === 1 ? "blocco" : "blocchi"}` : ""}</div>
+          <div style={{ color: MUTED, fontSize: 12 }}>{prettyDate(date)}{day ? ` · ${day.workouts.length} ${day.workouts.length === 1 ? "blocco" : "blocchi"}` : ""}{dur.label && <span style={{ color: "#ddd", fontWeight: 700 }}> · ⏱ {dur.label}</span>}</div>
         </div>
         {day && <button onClick={onEdit} style={btnGhost} aria-label="Modifica giorno"><PencilLine size={16} /></button>}
       </div>
@@ -76,7 +78,7 @@ export default function Calendario({ weekId, week, dayKey, setDayKey, onShift, o
         </div>
       )}
       {day?.workouts.map(w => (
-        <WorkoutCard key={w.id} w={w} name={name} date={date} onSetTimer={onSetTimer} prIds={prIds} onOpenAthlete={onOpenAthlete} done={done.has(w.id)} onToggleDone={onToggleDone && (() => onToggleDone(w))} entries={entries.filter(e => e.wod === w.id)}
+        <WorkoutCard key={w.id} w={w} name={name} date={date} onSetTimer={onSetTimer} prIds={prIds} onOpenAthlete={onOpenAthlete} duration={fmtBlock(dur.blocks.find(b => b.w.id === w.id)?.est || { min: 0, max: 0 })} done={done.has(w.id)} onToggleDone={onToggleDone && (() => onToggleDone(w))} entries={entries.filter(e => e.wod === w.id)}
           open={openForm === w.id} setOpen={o => setOpenForm(o ? w.id : null)} onAdd={async (...a) => { const e = await onAdd(...a); if (!e) setOpenForm(null); return e; }} onRemove={onRemove} />
       ))}
       {day && day.workouts.length === 0 && <div style={{ color: MUTED, padding: 16 }}>Giorno di riposo.</div>}
